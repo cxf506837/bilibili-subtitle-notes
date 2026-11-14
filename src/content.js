@@ -310,17 +310,20 @@
       detail: state.detail,
       at: new Date().toISOString(),
     };
-    chrome.runtime.sendMessage({ type: 'diag' }, function (r) {
-      if (r && r.ok) {
-        base.endpoint = r.endpoint;
-        base.model = r.model;
-        base.hasKey = r.hasKey;
-        base.ocr = r.ocr;
-      }
-      const text = S.diagText(base);
-      copyText(text).then(function (ok) {
-        setStatus(ok ? 'ok' : 'bad', ok ? '诊断信息已复制，贴到 issue 里就行' : '复制失败：请截图这段面板状态');
-        if (!ok) console.log('[bili-notes diag]\n' + text);
+    return new Promise(function (resolve) {
+      chrome.runtime.sendMessage({ type: 'diag' }, function (r) {
+        if (r && r.ok) {
+          base.endpoint = r.endpoint;
+          base.model = r.model;
+          base.hasKey = r.hasKey;
+          base.ocr = r.ocr;
+        }
+        const text = S.diagText(base);
+        copyText(text).then(function (ok) {
+          setStatus(ok ? 'ok' : 'bad', ok ? '诊断信息已复制，贴到 issue 里就行' : '复制失败：请截图这段面板状态');
+          if (!ok) console.log('[bili-notes diag]\n' + text);
+          resolve(text);
+        });
       });
     });
   }
@@ -2040,6 +2043,8 @@
   // 调试/验证用：不经下载直接拿到导出的 Markdown 文本
   window.__bnMarkdown = buildMarkdown;
   window.__bnTranscriptMarkdown = buildTranscriptMarkdown;
+  window.__bnCopyDiag = copyDiag;
+  window.__bnSetStatus = setStatus;
   // 调试：预览页里直接检查/触发小节（真机上小节靠播够 8 块自动生成）
   window.__bnSections = {
     run: maybeSections,
