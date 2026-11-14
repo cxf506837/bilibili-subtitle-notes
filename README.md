@@ -19,7 +19,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 3. 点「加载解压缩的扩展」，选本仓库根目录（有 `manifest.json` 的那一层）。
 4. 点工具栏拼图图标把「B站可核对笔记」钉出来；打开任意视频页点它，按「设置」填 API Base / 模型 / Key。
 
-任何 OpenAI 兼容端点都行（DeepSeek / 通义 / 智谱 / Moonshot / OpenAI）。装不上、图标灰着、Key 存不住 → [docs/install.md](docs/install.md)。
+任何 OpenAI 兼容端点都行（DeepSeek / 通义 / 智谱 / Moonshot / OpenAI）。不想自己打包的话，[Releases](https://github.com/cxf506837/cxf2/releases) 里有打好的 zip（完整版带本地 OCR，轻量版 60 KB）。装不上、图标灰着、Key 存不住 → [docs/install.md](docs/install.md)。
 
 ## 用
 

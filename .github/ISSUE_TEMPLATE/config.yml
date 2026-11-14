@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: 装不上 / 图标灰着 / Key 存不住 / 画面字幕按钮不见了
-    url: https://github.com/OWNER/REPO/blob/main/docs/install.md
+    url: https://github.com/cxf506837/cxf2/blob/main/docs/install.md
     about: 先看安装与排错文档，里面列了 Edge 157 上实测过的五个坑

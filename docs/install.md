@@ -32,7 +32,7 @@ node test/zip.mjs          # 完整（缺 OCR 资源会直接报错，不会打�
 node test/zip.mjs --lite   # 轻量
 ```
 
-> `vendor/ocr` 体积大（约 29 MB）不进 git，完整包需要先把 OCR 资源放进 `vendor/ocr/`（见仓库 Release 附件）。缺文件时 `zip.mjs` 会明确告诉你缺哪个，不会静默打出一个没有 OCR 的"完整包"。
+> `vendor/ocr` 体积大（约 29 MB）不进 git。两种拿法：直接下载 [https://github.com/cxf506837/cxf2/releases](https://github.com/cxf506837/cxf2/releases) 里打好的完整包；或者下载其中的 `ocr-assets.zip` 解压到 `vendor/ocr/` 再自己打包。缺文件时 `zip.mjs` 会明确告诉你缺哪个，不会静默打出一个没有 OCR 的"完整包"。
 
 ## 需要的前置条件
 
