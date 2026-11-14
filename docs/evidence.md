@@ -85,6 +85,23 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 - 错字会进原话（读的是像素），数字、人名、公式最容易错；40 条样本里肉眼可见错字 3~5 处，不影响理解。
 - OCR 引擎对比：tesseract.js（chi_sim_best）在 1080p 课件帧上基本不可用（正文被认成「在三角形 4BC 中，已知 w，D，4」），换 PP-OCRv6 tiny（ONNX Runtime Web + wasm）后同一帧几乎全对，初始化 270ms、单帧 1.3~1.5 秒，全在本机。
 
+### 2026-11-15 真机端到端（有屏录像为证）
+
+前面那条是 v0.6.0 的旧记录。2026-11-15 在一台真机（Edge 157 + 真扩展 + 未登录也会挡的干净 profile）上把整条链路走完一次：
+
+| 步骤 | 实测 |
+| --- | --- |
+| 选片 | 话题页里逐条开，读 `window.__bnState.verdict`；`BV1yt4B6QEfs` 首次判 `rejected`（接口给了一份过不了闸的字幕） |
+| 入口 | 判 rejected 后「画面字幕」按钮自动出现（`btnHard` 的 hidden 被摘掉），点下去文字变成「停止识别」 |
+| 跑起来 | `state.verdict` 从 `rejected` 变 `hardsub`；面板显示「已记 6 句 / 0 段」「正在识别画面底部的字幕…」「本地识别，不上传画面」 |
+| 采样速度 | 8 秒 8 帧、15 秒 15 帧（约 1 帧/秒），`lastT` 跟着播放进度走 |
+| 出结果 | 15 秒内 cues 从 2 涨到 6；截图 `_lab/tour/20-hardsub-cues-BV1yt4B6QEfs.png`（1280×800，真页面真字幕带） |
+
+同一天还试了两个反例，写下来免得以后再踩：
+
+- `BV1m2pTzCEXc`：判 rejected、按钮出现、连跑 144 秒 83 帧，cues 始终 0——这条视频的字幕不在识别用的底部带（或有软字幕但画面没烧字），说明「按钮出现」不等于「一定有字可认」。
+- 先按 `player/v2` 的 `subtitle.subtitles.length === 0` 挑片**不可靠**：`BV1FMWG6fEGf` 接口 0 轨，扩展自己取样后判成 `single`（有一份过闸的字幕），按钮根本不出现。挑片判据只能是页面里的 `__bnState.verdict`。
+
 ## 七、设置页的端点白名单（W2-1）
 
 为什么要在保存时拦：MV3 里对**没在 `host_permissions` 声明过**的域名发 `fetch`，只会抛 `TypeError: Failed to fetch`——和断网、DNS 错、Key 错是同一句话。事后再想区分已经不可能，所以必须在用户点「保存」那一刻拦下来，并告诉他能用哪几家。
@@ -104,7 +121,7 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 
 变异测试：把 `src/options.js` 里两道 `if (!allow.ok) return show(originError(allow), true);` 删掉后重跑 `test/options.test.mjs`，6 条变红；恢复后 21 条全绿。
 
-`node test/run-all.mjs` 现在 **269 条断言**（原 171 + endpoint 30 + options 21 + transcript 27 + diag 20），不需要网络、不花钱。
+`node test/run-all.mjs` 现在 **309 条断言**（gate 40 / vote 10 / pages 15 / section 25 / visual 9 / hardsub 61 / pipeline 11 / endpoint 30 / options 21 / transcript 27 / diag 20 / realdata 40），不需要网络、不花钱。
 ## 八、没配 API Key 也能拿到字幕全文（W2-3）
 
 为什么要有这条：闸门跑完的那一刻，字幕已经在手里了，但以前只有模型返回之后才有「笔记」，所以没填 Key 的用户点「导出」得到的是一份只有标题和 BV 号的空文件——看起来像产品坏了。
@@ -173,9 +190,25 @@ bili-notes 1.0.0 · 2026-11-14T12:28:29.839Z
 顺带验到一条真实的失败路径：文档没有焦点时剪贴板写不进去，面板会显示「复制失败：请截图这段面板状态」——这是设计好的兜底，不是崩溃。（`navigator.clipboard.readText` 在无焦点时抛 `Document is not focused`，所以自动化要先 `Page.bringToFront`。）
 ## 十、还没验证的（别当成全跑通了）
 
+2026-11-15 补验之后，这张清单短了：画面字幕整条链路、全新 profile 从 GitHub clone 直接加载，都已经真跑过（见第六节与第十一节）。仍然没有证据的是：
+
 - 除 DeepSeek 之外厂商（OpenAI / 通义 / 智谱 / Moonshot）的真实调用、限流、超长视频下的成本。
-- 真扩展里的两次真实点击**已补验**（导出入 168,723 字节的 .md、诊断文本进了剪贴板，见第八、九节）；剩下的与点击无关。
-- 画面字幕在「手写板书 / 极长单句 / 字幕贴画面中部」的视频上；
-- 画面字幕的错字率没有量化过（只有耶鲁公开课一条人工看过）。
+- 画面字幕在「手写板书 / 极长单句 / 字幕贴画面中部」的视频上；也只覆盖到一条真视频（`BV1yt4B6QEfs`）。
+- 画面字幕的错字率没有量化过（只有耶鲁公开课一条人工看过，加上 `BV1yt4B6QEfs` 的 6 句肉眼扫过）。
 - 投票防不住「某次接口连着 3 次返回同一份错文件」（原理上防不住，目前没样本）。
 - 抽样转写音频和字幕比文字（ASR 校验）没做。
+- 商店审核结果（v1.0.1 于 2026-11-14 提交，官方口径 7 个工作日）。
+
+## 十一、全新机器从 GitHub clone 直接加载（2026-11-15 实测）
+
+模拟陌生人：`git clone --depth 1` 到临时目录（**不带** `.git` 里的历史、不带 `dist/`），用全新的空 profile 启动 Edge，`--load-extension` 指向 clone 出来的目录。
+
+| 检查 | 实测 |
+| --- | --- |
+| clone 体积/文件数 | 119 个文件（GitHub 侧 54 个受控文件 + 自动生成的目录项） |
+| manifest | `B站字幕笔记` 1.0.1，permissions 4 条，host_permissions 10 条 |
+| 扩展是否起来 | 起来了；新 profile 下 id 为 `djkocglbgleoljmdoomampffnfgagapa`（不同目录会变，不要硬编码） |
+| 面板 | 真 B站 视频页右侧出现面板，状态条写「请先登录 B站」（干净 profile 没登录 B站，属预期），按钮组齐全 |
+| 设置页 | `chrome-extension://<id>/src/options.html` 标题「B站字幕笔记 · 设置」，预设 7 项，默认 `https://api.deepseek.com/v1` + `deepseek-chat`，Key 空 |
+
+顺带记一个只有测试才会踩的坑：`--load-extension` 在同一个 profile 上第二次启动时，扩展可能整体不加载（目标列表里连 `chrome-extension://` 都没有）。每次验证都用新的空 profile，别复用。
