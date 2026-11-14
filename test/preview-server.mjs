@@ -1,8 +1,9 @@
 import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
-const root = new URL('../', import.meta.url).pathname.replace(/^\//, '').replace(/\/$/, '');
+const root = fileURLToPath(new URL('../', import.meta.url)).replace(/[\\/]$/, '');
 const port = Number(process.argv[2] || 8799);
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.wasm': 'application/wasm', '.ort': 'application/octet-stream', '.json': 'application/json; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };

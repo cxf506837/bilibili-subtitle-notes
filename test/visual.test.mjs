@@ -1,9 +1,11 @@
 // 画面文字通道：prompt 拼接 + 校验放宽（数字可以来自画面，但 quote 仍然只能来自字幕）
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
-const root = new URL('..', import.meta.url).pathname.replace(/^\//, '');
-const src = readFileSync(root + 'src/summarize.js', 'utf8');
+const root = fileURLToPath(new URL('..', import.meta.url));
+const src = readFileSync(join(root, 'src/summarize.js'), 'utf8');
 const ctx = { window: {} };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
