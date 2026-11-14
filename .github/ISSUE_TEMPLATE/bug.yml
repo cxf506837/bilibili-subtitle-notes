@@ -45,7 +45,7 @@ body:
     id: diag
     attributes:
       label: 诊断信息
-      description: 面板状态条原话 + 设置页里填的模型名（Key 不要贴）+ 第一次失败时的截图
+      description: 面板上点「复制诊断」（状态条不是绿色时会出现，复制到的是版本/页面/端点，不含 Key），把那段贴这里；再补一句设置页里选的模型
   - type: textarea
     id: console
     attributes:

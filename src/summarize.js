@@ -341,6 +341,45 @@
     out.push('');
     return out.join('\n');
   }
+
+  // 出问题时让用户一键复制这段，贴到 issue 里：版本、页面、字幕状态、端点。
+  // 不含 Key；URL 只留 origin + pathname + p（spm_id_from 之类的推广参数不往外带）。
+  function diagText(info) {
+    const i = info || {};
+    const clean = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+    const out = [];
+    out.push('bili-notes ' + (clean(i.version) || '?') + (i.at ? ' · ' + clean(i.at) : ''));
+    let url = clean(i.url);
+    if (url) {
+      try {
+        const u = new URL(url);
+        const pg = u.searchParams.get('p');
+        url = u.origin + u.pathname + (pg ? '?p=' + pg : '');
+      } catch (e) { /* 不是完整 URL 就原样保留 */ }
+      out.push('页面: ' + url + (Number(i.totalPages) > 1 ? '（P' + Number(i.page) + '/' + Number(i.totalPages) + '）' : ''));
+    }
+    if (i.title) out.push('标题: ' + clean(i.title).slice(0, 160));
+    const v = clean(i.verdict);
+    if (v) {
+      const parts = [v];
+      if (i.votes) parts.push(String(i.votes) + ' 次取样一致');
+      if (i.trackLan) parts.push(clean(i.trackLan));
+      parts.push(String(Number(i.sentences) || 0) + ' 句');
+      out.push('字幕: ' + parts.join(' · '));
+    }
+    if (i.endpoint || i.model) {
+      const ep = [];
+      if (i.endpoint) ep.push(clean(i.endpoint));
+      if (i.model) ep.push('模型 ' + clean(i.model));
+      ep.push(i.hasKey ? 'Key 已填' : 'Key 未填');
+      out.push('端点: ' + ep.join(' · '));
+    }
+    if (i.ocr !== undefined && i.ocr !== null) out.push('本机 OCR: ' + (i.ocr ? '可用' : '不可用（轻量包或缺文件）'));
+    const st = clean(i.status);
+    const det = clean(i.detail);
+    if (st || det) out.push('状态: ' + (st || '?') + (det ? ' · ' + det.slice(0, 200) : ''));
+    return out.join('\n');
+  }
   function toPromptLines(block, sentences) {
     const byId = new Map(sentences.map((s) => [s.sid, s]));
     const lines = block.sids.map((sid) => {
@@ -350,5 +389,5 @@
     return Object.assign({}, block, { lines });
   }
 
-  root.BnSum = { CHUNK, chunkSentences, promptFor, validate, validatePoint, toPromptLines, readabilityPrompt, sectionPrompt, validateSection, normalize, transcriptMarkdown, fmtTime };
+  root.BnSum = { CHUNK, chunkSentences, promptFor, validate, validatePoint, toPromptLines, readabilityPrompt, sectionPrompt, validateSection, normalize, transcriptMarkdown, fmtTime, diagText };
 })(typeof window !== 'undefined' ? window : globalThis);

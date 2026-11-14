@@ -162,6 +162,7 @@
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▾</button>',
     '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
     '<button class="btn hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
+    '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">复制诊断</button>',
     '<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
     '<button class="btn accent" id="btnFold" title="收起右侧笔记面板">收起 ▸</button>',
     '<div class="foldonly foldbrand" id="foldBrand" title="展开右侧笔记面板">笔记</div>',
@@ -260,6 +261,68 @@
     statusText.textContent = text;
     statusText.title = detail || text;
     dot.className = 'dot ' + (kind === 'ok' ? 'ok' : kind === 'warn' ? 'warn' : kind === 'bad' ? 'bad' : '');
+    // 出错时才露出「复制诊断」：平时不占地方，出问题那一刻它就在手边。
+    const db = $('btnDiag');
+    // warn 也要给：用户报的大多是「字幕只有一部分 / 单次取样」，那都是 warn。
+    if (db) db.classList.toggle('hidden', !kind || kind === 'ok');
+  }
+
+  // 剪贴板：扩展页/内容脚本的权限模型不一样，先试 navigator.clipboard，失败退到 execCommand。
+  function copyText(text) {
+    function fallback(t) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = t;
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+    return new Promise(function (resolve) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { resolve(true); }, function () { resolve(fallback(text)); });
+          return;
+        }
+      } catch (e) { /* 落到兜底 */ }
+      resolve(fallback(text));
+    });
+  }
+
+  function copyDiag() {
+    const m = state.meta || {};
+    const base = {
+      version: (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '',
+      url: location.href,
+      title: m.title || document.title,
+      verdict: state.verdict,
+      votes: state.votes,
+      sentences: state.sentences.length,
+      trackLan: state.trackLan,
+      totalPages: Number(m.pages) || 0,
+      page: Number(m.page) || 0,
+      status: state.status,
+      detail: state.detail,
+      at: new Date().toISOString(),
+    };
+    chrome.runtime.sendMessage({ type: 'diag' }, function (r) {
+      if (r && r.ok) {
+        base.endpoint = r.endpoint;
+        base.model = r.model;
+        base.hasKey = r.hasKey;
+        base.ocr = r.ocr;
+      }
+      const text = S.diagText(base);
+      copyText(text).then(function (ok) {
+        setStatus(ok ? 'ok' : 'bad', ok ? '诊断信息已复制，贴到 issue 里就行' : '复制失败：请截图这段面板状态');
+        if (!ok) console.log('[bili-notes diag]\n' + text);
+      });
+    });
   }
 
   function fmt(t) {
@@ -2113,6 +2176,7 @@
   $('awayMini').addEventListener('click', function () { openCatchup(state.away.last); });
   $('btnOutline').addEventListener('click', function () { outline.classList.toggle('hidden'); });
   $('btnExport').addEventListener('click', exportMarkdown);
+  $('btnDiag').addEventListener('click', copyDiag);
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
   $('btnOpt').addEventListener('click', function () {
     if (chrome.runtime && chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();

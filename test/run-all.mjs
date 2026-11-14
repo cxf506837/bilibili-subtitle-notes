@@ -13,6 +13,7 @@ const FILES = [
   'endpoint.test.mjs',    // 设置页端点白名单
   'options.test.mjs',     // 设置页真实代码路径（假 DOM）
   'transcript.test.mjs', // 无 Key 时的字幕全文导出
+  'diag.test.mjs',      // 一键复制的诊断信息
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

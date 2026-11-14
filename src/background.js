@@ -177,7 +177,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .catch((e) => sendResponse({ ok: false, error: String(e).slice(0, 200) }));
     return true;
   }
-  if (msg && msg.type === 'chat') {
+  if (msg && msg.type === 'diag') {
+    (async () => {
+      const cfg = await readConfig();
+      let ocr = false;
+      try { ocr = await ocrAvailable(); } catch (e) {}
+      let endpoint = cfg.apiBase;
+      try { endpoint = new URL(cfg.apiBase).host; } catch (e) {}
+      return { ok: true, endpoint: endpoint, model: cfg.model, hasKey: !!cfg.apiKey, ocr: ocr };
+    })().then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e).slice(0, 200) }));
+    return true;
+  }  if (msg && msg.type === 'chat') {
     chat(msg.payload || msg)
       .then(sendResponse)
       .catch((e) => sendResponse({ ok: false, code: 'exception', error: String(e).slice(0, 200) }));
