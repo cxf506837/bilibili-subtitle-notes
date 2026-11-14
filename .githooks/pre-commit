@@ -1,9 +1,19 @@
 #!/bin/sh
-# 提交前扫描敏感信息。临时跳过：git commit --no-verify
+# 提交前扫描敏感信息（密钥 / 本机绝对路径）。
+# 临时跳过：git commit --no-verify
+#
+# 找 node 的顺序：$BN_NODE → 本地 git 配置 bn.node（不随仓库走）→ PATH 里的 node。
+# 都找不到就**阻断**而不是放行：这个钩子唯一的作用就是拦密钥，
+# 悄悄跳过等于没有钩子，而且那次提交不会留下任何记录。
 node_bin="$BN_NODE"
+[ -z "$node_bin" ] && node_bin="$(git config --get bn.node 2>/dev/null)"
 [ -z "$node_bin" ] && node_bin="$(command -v node 2>/dev/null)"
+[ -z "$node_bin" ] && node_bin="$(command -v nodejs 2>/dev/null)"
 if [ -z "$node_bin" ]; then
-  echo "[pre-commit] 找不到 node，跳过敏感信息检查（可用 BN_NODE 指定）"
-  exit 0
+  echo "[pre-commit] 找不到 node，无法扫描敏感信息，已阻断本次提交。"
+  echo "  只在本机设一次：git config bn.node /path/to/node"
+  echo "  或者临时：BN_NODE=/path/to/node git commit ..."
+  echo "  确实要跳过：git commit --no-verify"
+  exit 1
 fi
 "$node_bin" test/check-secrets.mjs || exit 1
