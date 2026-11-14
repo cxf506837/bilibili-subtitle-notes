@@ -8,14 +8,13 @@ function show(text, bad) {
   msg.style.color = bad ? '#e74c3c' : '#2ecc71';
 }
 
-chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled', 'bn.audioEnabled'], (r) => {
+chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled'], (r) => {
   $('apiBase').value = r.apiBase || 'https://api.deepseek.com/v1';
   $('model').value = r.model || 'deepseek-chat';
   $('apiKey').value = r.apiKey || '';
   $('maxTokens').value = r.maxTokens || 700;
   $('awayEnabled').checked = r['bn.awayEnabled'] !== false;
   $('visualEnabled').checked = r['bn.visualEnabled'] !== false;
-  $('audioEnabled').checked = r['bn.audioEnabled'] === true;
 });
 
 $('save').addEventListener('click', () => {
@@ -26,8 +25,7 @@ $('save').addEventListener('click', () => {
   if (!apiBase || !model) return show('API Base 和模型都要填', true);
   const awayEnabled = $('awayEnabled').checked;
   const visualEnabled = $('visualEnabled').checked;
-  const audioEnabled = $('audioEnabled').checked;
-  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled, 'bn.audioEnabled': audioEnabled }, () => {
+  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled }, () => {
     show('已保存。回到 B站 视频页刷新即可生效。');
   });
 });

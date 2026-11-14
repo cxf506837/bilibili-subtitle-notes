@@ -1,0 +1,53 @@
+name: 装了用不了
+description: 装不上、图标灰着、面板不出现、按钮点了没反应、导出是空的。
+title: "[用不了] "
+body:
+  - type: dropdown
+    id: stage
+    attributes:
+      label: 卡在哪一步
+      options:
+        - 加载扩展就失败（Edge 报错/条目变灰）
+        - 扩展装上了，视频页不出现面板/图标
+        - 面板出现，但抓不到字幕
+        - 面板出现，字幕有了，但笔记不出（或一直转圈）
+        - 导出 Markdown 是空的 / 少了内容
+        - 设置存不住（Key 填了又没了）
+        - 其它
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 浏览器与版本
+      placeholder: Edge 157.0.3606.21
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: 怎么装的
+      options:
+        - 加载解压缩的扩展（仓库目录或 dist 里解压出来的完整包）
+        - 加载解压缩的扩展（轻量包）
+        - 浏览器商店
+        - 不确定
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 写了什么字、点了什么、看到什么。面板截图 + 扩展页截图最好
+    validations:
+      required: true
+  - type: textarea
+    id: diag
+    attributes:
+      label: 诊断信息
+      description: 面板状态条原话 + 设置页里填的模型名（Key 不要贴）+ 第一次失败时的截图
+  - type: textarea
+    id: console
+    attributes:
+      label: 报错（如果有）
+      description: 视频页按 F12 → Console，把红色报错贴上来；扩展页点「service worker」也能看后台报错

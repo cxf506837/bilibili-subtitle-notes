@@ -1,6 +1,6 @@
 # B 站「可核对听课笔记」扩展 — 决策记录
 
-> 状态：设计定稿，未开工。日期 2026-11-12。所有「实测」均指 2026-11-12 在本机登录态下跑出来的数字，脚本与原始数据在 `../bili-probe/`。
+> 这是一份从 2026-11-12 起连续写的**决策/实测记录**（按时间追加，前面的结论后面可能被推翻，翻到最新一条为准）。文中所有「实测」都是在本机登录态下真跑出来的数字，60 条样本的原始数据在 [`test/fixtures/probe-results.json`](../test/fixtures/probe-results.json)。
 
 ## 0. 一句话
 
@@ -341,7 +341,7 @@ B 站页面 (content script)
 
 ### 测试与交付
 - `test/gate.test.mjs` 断言随之改写：时间戳改为「按 sids 推导」，新增「引用被改写时改用原文」「不给 quote 时自动拼接」，29 passed；`pipeline` 11/11、`realdata` 40/40 不变。
-- `test/real-model.mjs` 可直接跑真模型冒烟（参数 `[模型] [块数]`，Key 从 `BN_KEY` 或桌面 key 文件读）。
+- `test/real-model.mjs` 可直接跑真模型冒烟（参数 `[模型] [块数]`，Key 从 `BN_KEY` 环境变量读）。
 - 界面：引文是整句拼接、可能较长，`.pt .q` 加 3 行截断 + `title` 悬停看全文。
 - 产物：`dist/bili-notes-v0.1.2.zip`（51,159 字节，manifest 0.1.2）。
 
@@ -620,7 +620,7 @@ L2-B 拍板「不做」之后，候选队列是：多 P → 导出带画面文�
 
 ## v0.6.1 实施记录（2026-11-13）：字幕按哈希投票，不再「第一个通过就用」
 
-**为什么改**：用户说「总结的不知道什么东西，完全看不懂」。拿他正在学的课 `BV1JynA6aEug`（401 秒）实测：同一个 (aid,cid) 连取 8 次，拿到 **4 种不同文件** ——
+**为什么改**：作者当时抱怨「总结出来的完全看不懂是什么东西」。拿当时在学的课 `BV1JynA6aEug`（401 秒）实测：同一个 (aid,cid) 连取 8 次，拿到 **4 种不同文件** ——
 
 | 内容 | 句数 | 时长覆盖 | 出现次数 |
 | --- | --- | --- | --- |
@@ -848,7 +848,7 @@ Edge 关闭时直接改 `Edge\User Data\Default\Preferences` 的 `extensions.pin
   - `Local State` 里 `startup_boost = {"default_last_launch":true,"last_browser_open_time":"...","local_blocked_extensions":["odlomjlbamekndcpllcnffbgeohgkmjh"]}`；
   - 对应进程命令行 `msedge.exe --no-startup-window /prefetch:5`（本次 PID 40212，12:43:19 启动），另有 crashpad-handler / gpu-process / network、storage utility / 2 个 renderer 作为它的子进程。
   - 设置位置：`edge://settings/system` →「启动增强」。关掉之后关窗口 = 真退出。
-- 实测对照：窗口已全关（UIA 枚举 `Chrome_WidgetWin_1` 只剩 DSH/ChatGPT/Clash 三个别的 Chromium 应用），msedge 仍有 7 个进程；对这些进程的 5 个隐藏窗口（`crashpad_SessionEndWatcher` / `Chrome_WidgetWin_0` / `Base_PowerMessageWindow` / 2×`IME`）PostMessage(WM_CLOSE) 无效，进程数反而 7→8。
+- 实测对照：窗口已全关（UIA 枚举 `Chrome_WidgetWin_1` 只剩别的几个 Chromium 应用），msedge 仍有 7 个进程；对这些进程的 5 个隐藏窗口（`crashpad_SessionEndWatcher` / `Chrome_WidgetWin_0` / `Base_PowerMessageWindow` / 2×`IME`）PostMessage(WM_CLOSE) 无效，进程数反而 7→8。
 
 ### 3. 硬杀浏览器 = 丢 B站 登录态（因果链）
 1. 我用 `Get-Process msedge | Stop-Process -Force` 关浏览器；
@@ -907,3 +907,7 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 - 用户 2026-11-14 13:0x 拍板：B站「**还登录着**」；断言修正「**授权，改完重跑**」；后台开关「**先别关（推荐）**」。
 - 因此本轮**不动用户浏览器**：不关那个后台开关、不关浏览器、不做 Cookies 快照。安全全靠纪律（绝不强杀、只用 `CloseMainWindow()` + 轮询、升级走 `sync-my-edge.ps1` + 手动「重新加载」+ F5）。
 - A+ 的前置条件不变：要 `-Backup` 成功，得先让用户关掉那个后台开关 → 关窗口 → 确认进程真退干净 → 再备份。用户不想现在动，就等下一次他主动重登或重启机器时再说。
+
+---
+
+2026-11-14 公开前整理：删掉了「音画对齐 / 音频抽样」整套（`src/align.js`、`src/audio.js` 及对应测试）——它同时要跨域取音轨和 ASR，维护成本和失败面都远超定位；本文件前面提到它的段落保留原样，当历史看。

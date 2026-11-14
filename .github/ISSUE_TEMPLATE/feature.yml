@@ -1,0 +1,32 @@
+name: 想要的功能
+description: 先说清楚要解决什么，再谈怎么做。
+title: "[功能] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        功能请求请**先开 issue，不要直接提 PR**（见 CONTRIBUTING）。
+        维护只有一个业余时间的人，所以判断标准是「这个功能是不是在解决同一个问题：让视频内容变成能核对、能带走的文字」。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到的具体场景
+      description: 一个真实的视频、真实的操作序列。不要写「希望支持更多网站」这种。
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 现在你怎么绕过它
+      description: 手动复制字幕？换别的工具？说清现在的成本
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你设想的做法（可选）
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 先确认不在范围内
+      options:
+        - label: 我理解这个项目不做服务器、账号、云同步，也不打算支持 B站 以外的站点
+          required: true

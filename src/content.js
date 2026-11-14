@@ -13,7 +13,6 @@
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, lastTime: 0,
     covered: [], lastTick: null, emptyHint: '', follow: true, queueHold: false,
     // 默认关：B站 AI 字幕几乎连续，判不出偏移；还要接管一次音频输出，不值当默认开
-    audio: { enabled: false, status: 'off', res: null, note: '' },
     // 走神补课：spans 记「你不在这段」的区间；shown 表示这次播放里已经弹过横幅
     away: { enabled: true, spans: [], last: null, shown: false, seen: {}, catchup: null, bannerSpan: null, skew: 0 },
     // 画面通道：从视频帧 OCR 出来的 PPT/板书文字。本地跑，不花钱。
@@ -142,9 +141,6 @@
     '.vwrap.open .vtext { display: block; }',
     '.vnote { margin: 6px 10px 0; font-size: 11px; opacity: .6; }',
     // 音画对齐的结果（只在开启音频自检、且真的采到声音之后出现）
-    '.atag { margin: 6px 10px 0; font-size: 11px; opacity: .62; }',
-    '.atag.warn { opacity: .95; color: #d98b1f; }',
-    '.atag.hidden { display: none; }',
     '.vnote.hidden { display: none; }',
     '.btn.hidden { display: none; }',
     '.note .hstag { font-size: 11px; opacity: .55; margin-left: 6px; font-weight: 400; }',
@@ -172,7 +168,6 @@
     '<div class="foldonly foldcount zero" id="foldCount" title="已生成的笔记条数">0</div>',
     '</div>',
     '<div class="vnote hidden" id="rnote"></div>',
-    '<div class="atag hidden" id="audioTag"></div>',
     '<div class="away hidden" id="away">',
     '<span class="at" id="awayText"></span>',
     '<span class="ab">',
@@ -307,7 +302,7 @@
     const v = getVideo();
     if (!v) return;
     // 字幕整体偏移时，要跳到「声音真的在那里」的位置
-    v.currentTime = audT(sec);
+    v.currentTime = sec;
     if (v.paused) v.play().catch(function () {});
   }
 
@@ -323,7 +318,7 @@
     h.className = 'h';
     const t = document.createElement('span');
     t.className = 't';
-    t.textContent = fmtA(note.start);
+    t.textContent = fmt(note.start);
     t.addEventListener('click', function () { seekTo(note.start); });
     const sum = document.createElement('span');
     sum.className = 'sum';
@@ -403,7 +398,7 @@
     const watching = state.lastTime >= from - 0.5 && state.lastTime <= to + 0.5;
     const tt = document.createElement('span');
     tt.className = 'tt';
-    tt.textContent = (watching ? '正在看 ' : '未观看 ') + fmtA(from) + '–' + fmtA(to);
+    tt.textContent = (watching ? '正在看 ' : '未观看 ') + fmt(from) + '–' + fmt(to);
     const cnt = document.createElement('span');
     cnt.textContent = '· ' + count + ' 段';
     h.appendChild(tt);
@@ -418,7 +413,7 @@
     const go = document.createElement('button');
     go.className = 'btn sm';
     go.textContent = '去看这段';
-    go.title = '跳到 ' + fmtA(from) + ' 开始看';
+    go.title = '跳到 ' + fmt(from) + ' 开始看';
     go.addEventListener('click', function () { seekTo(from); });
     bs.appendChild(sum);
     bs.appendChild(go);
@@ -558,13 +553,13 @@
       }
       if (sec && sec !== lastSec) {
         const from = sec.from, to = sec.to;
-        const d = row('item sec', fmtA(from) + '–' + fmtA(to), sec.title || '这一节', function () { seekTo(from); });
+        const d = row('item sec', fmt(from) + '–' + fmt(to), sec.title || '这一节', function () { seekTo(from); });
         d.dataset.from = String(from);
         d.dataset.to = String(to);
         d.title = (sec.oneLine ? sec.oneLine + '\n' : '') + '点一下跳到这一节开头';
         lastSec = sec;
       }
-      row('item', fmtA(n.start), n.blockSummary || n.oneThing || '', function () { seekTo(n.start); scrollToNote(n.start); });
+      row('item', fmt(n.start), n.blockSummary || n.oneThing || '', function () { seekTo(n.start); scrollToNote(n.start); });
     });
     outline.scrollTop = keep;
     markOutline();
@@ -781,7 +776,7 @@
       row.className = 'row';
       const t = document.createElement('span');
       t.className = 't';
-      t.textContent = fmtA(n.start);
+      t.textContent = fmt(n.start);
       t.addEventListener('click', function () { seekTo(n.start); });
       const s = document.createElement('span');
       s.className = 's';
@@ -801,10 +796,10 @@
       row.className = 'row';
       const t = document.createElement('span');
       t.className = 't';
-      t.textContent = fmtA(run.from);
+      t.textContent = fmt(run.from);
       const s = document.createElement('span');
       s.className = 's';
-      s.textContent = '没记 · ' + run.count + ' 段（' + fmtA(run.from) + '–' + fmtA(run.to) + '）';
+      s.textContent = '没记 · ' + run.count + ' 段（' + fmt(run.from) + '–' + fmt(run.to) + '）';
       const sum = document.createElement('button');
       sum.className = 'btn sm accent';
       sum.textContent = '总结这段';
@@ -845,7 +840,6 @@
       dbg('hidden-track', { from: +hiddenFrom.toFixed(2) });
       return;
     }
-    if (audioCap) audioCap.resume();
     if (!hiddenWall) { dbg('visible-skip', { why: 'no-hidden-wall' }); return; }
     const ms = nowMs() - hiddenWall;
     const to = Math.max(hiddenFrom, state.lastTime || 0, v ? v.currentTime : 0);
@@ -1272,84 +1266,6 @@
     }
   }
 
-  // ---- 音频通道：只采「正在播放」的音量包络 → 判字幕和声音对不对得上（L2-A 音画对齐）----
-  // 不转写、不上传、不花钱：只算每 0.2 秒的音量，和字幕的时间轴比对。
-  let audioCap = null;
-  let audioTimer = null;
-
-  function audShift(t) {
-    if (!state.audio.res || !window.BnAlign) return 0;
-    return window.BnAlign.shiftFor(state.audio.res, t);
-  }
-  // 字幕时间 → 视频时间：字幕整体偏了的时候，点时间要跳到「声音真的在那里」的位置
-  function audT(t) { return t + audShift(t); }
-  function fmtA(t) { return fmt(audT(t)); }
-
-  function setAudioTag(msg, warn) {
-    state.audio.note = msg || '';
-    const el = $('audioTag');
-    if (!el) return;
-    el.textContent = state.audio.note;
-    el.classList.toggle('hidden', !state.audio.note);
-    el.classList.toggle('warn', !!warn);
-  }
-
-  function audioTick() {
-    if (!audioCap || !window.BnAlign || !state.sentences.length) return;
-    const all = audioCap.samples();
-    if (all.length < 100) return;             // 采到的语音不足 20 秒，先算不出来
-    // 只看前 30 分钟的量：足够判整体偏移和漂移，也不必随着视频变长越算越慢
-    const use = all.length > 9000 ? all.slice(0, 9000) : all;
-    const res = window.BnAlign.analyze(use, state.sentences);
-    const shiftBefore = state.audio.res ? audShift(state.lastTime || 0) : 0;
-    state.audio.res = res;
-    state.audio.status = audioCap.stats().state;
-    const shiftNow = audShift(state.lastTime || 0);
-    const warn = res.verdict === 'offset' || res.verdict === 'drift' || res.verdict === 'unreliable';
-    // 「判不出来」不占界面：B站 AI 字幕几乎句句相接，这种情况占绝大多数，写出来只会让人以为出了问题
-    const show = res.verdict === 'aligned' || res.verdict === 'offset' || res.verdict === 'drift' || res.verdict === 'unreliable';
-    setAudioTag(show ? window.BnAlign.describe(res) : '', warn);
-    // 时间映射变了就把已经画出来的时间重画一遍（变化小于 0.2 秒不值得重排）
-    if (Math.abs(shiftNow - shiftBefore) > 0.2) {
-      renderStream();
-      renderOutline();
-    }
-  }
-
-  function startAudio() {
-    if (!state.audio.enabled || !window.BnAudio) return;
-    if (!state.blocks.length || !state.sentences.length) return;
-    if (!audioCap) {
-      audioCap = window.BnAudio.create(getVideo, {
-        shouldRun: function () { return !!(state.blocks.length && state.sentences.length); },
-      });
-    }
-    if (!audioCap.start()) return;
-    if (!audioTimer) audioTimer = setInterval(audioTick, 15000);
-    state.audio.status = audioCap.stats().state;
-  }
-  function stopAudio() {
-    if (audioTimer) { clearInterval(audioTimer); audioTimer = null; }
-    if (audioCap) audioCap.stop();
-    state.audio.status = 'off';
-  }
-  function resetAudio() {
-    stopAudio();
-    if (audioCap) audioCap.reset();
-    state.audio.res = null;
-    setAudioTag('');
-  }
-
-  // 调试：预览页 / 真机探针里直接看采集到多少
-  window.__bnAudio = {
-    stats: function () { return audioCap ? audioCap.stats() : null; },
-    res: function () { return state.audio.res; },
-    tick: function () { audioTick(); return state.audio.note; },
-    count: function () { return audioCap ? audioCap.samples().length : 0; },
-    samples: function () { return audioCap ? audioCap.samples() : []; },
-    enabled: function (v) { state.audio.enabled = !!v; if (!v) stopAudio(); else startAudio(); return state.audio.enabled; },
-  };
-
   function callModel(messages) {
     return new Promise(function (resolve) {
       chrome.runtime.sendMessage({ type: 'chat', messages: messages }, function (r) {
@@ -1407,7 +1323,7 @@
       const to = bs[bs.length - 1].end;
       const payload = S.sectionPrompt(
         items.map(function (n) { return { oneThing: n.oneThing, summary: n.blockSummary }; }),
-        fmtA(from), fmtA(to));
+        fmt(from), fmt(to));
       const res = await callWithRetry(payload);
       if (!res.ok) { state.sectionDbg = { g: g, error: res.error || 'call-failed' }; return; }
       addCost(res.usage);
@@ -1601,7 +1517,6 @@
     v.addEventListener('play', onPlay);
     onTimeUpdate();
     startVisual();
-    startAudio();
     healPage(v);
   }
 
@@ -1833,7 +1748,6 @@
     renderReadability();
     hardReset();
     setVisualNote('');
-    resetAudio(); // 换视频 = 换一条音轨，旧的包络不能拿来比
     hideAway();
     renderEmpty('正在取字幕…');
     setStatus('init', '正在取字幕…');
@@ -1963,7 +1877,7 @@
   // 时间跳转链接：pageUrl() 可能已经带了 ?p=N，直接拼 '?t=' 会变成 ...?p=2?t=661
   function jumpUrl(t) {
     const u = pageUrl();
-    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 't=' + Math.floor(audT(Number(t) || 0));
+    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 't=' + Math.floor(Number(t) || 0);
   }
 
   function buildMarkdown() {
@@ -1990,12 +1904,12 @@
     out.push('# ' + heading);
     out.push('');
     sortedNotes().forEach(function (n) {
-      out.push('## ' + fmtA(n.start) + ' ' + (n.blockSummary || ''));
+      out.push('## ' + fmt(n.start) + ' ' + (n.blockSummary || ''));
       out.push('');
       (n.points || []).forEach(function (p) {
         out.push('- ' + p.plain);
         out.push('  > ' + p.quote);
-        out.push('  > [' + fmtA(p.start) + '](' + jumpUrl(p.start) + ')');
+        out.push('  > [' + fmt(p.start) + '](' + jumpUrl(p.start) + ')');
       });
       if (n.oneThing) {
         out.push('');
@@ -2006,7 +1920,7 @@
         out.push('**画面文字（OCR，机器识别，可能有错字，不是原话）**');
         out.push('');
         n.visual.forEach(function (v) {
-          out.push('[' + fmtA(v.t) + '](' + jumpUrl(v.t) + ')');
+          out.push('[' + fmt(v.t) + '](' + jumpUrl(v.t) + ')');
           out.push('');
           out.push('```');
           String(v.text || '').split(/\r?\n/).forEach(function (ln) { out.push(ln); });
@@ -2051,7 +1965,7 @@
   async function ask(q) {
     if (!q.trim()) return;
     const ctx = state.notes.slice(-6).map(function (n) {
-      return '[' + fmtA(n.start) + '] ' + (n.blockSummary || '') + ' ' + (n.points || []).map(function (p) { return p.plain; }).join('；');
+      return '[' + fmt(n.start) + '] ' + (n.blockSummary || '') + ' ' + (n.points || []).map(function (p) { return p.plain; }).join('；');
     }).join('\n');
     const box = document.createElement('div');
     box.className = 'note';
@@ -2217,13 +2131,11 @@
 
   // 先把默认宽度落到行内样式：只靠 CSS 默认值时，复制/粘贴或别的站点样式带偏就会撑满整页
   wrap.style.width = state.width + 'px';
-  chrome.storage.local.get(['bn.awayEnabled', 'bn.awaySeen', 'bn.visualEnabled', 'bn.audioEnabled'], function (r) {
+  chrome.storage.local.get(['bn.awayEnabled', 'bn.awaySeen', 'bn.visualEnabled'], function (r) {
     state.away.enabled = !(r && r['bn.awayEnabled'] === false);
     state.away.seen = (r && r['bn.awaySeen']) || {};
     state.visual.enabled = !(r && r['bn.visualEnabled'] === false);
-    state.audio.enabled = !!(r && r['bn.audioEnabled'] === true);
     if (state.visual.enabled) startVisual(); else stopVisual();
-    if (state.audio.enabled) startAudio(); else stopAudio();
   });
   if (chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(function (ch) {
@@ -2232,11 +2144,6 @@
         state.visual.enabled = ch['bn.visualEnabled'].newValue !== false;
         if (state.visual.enabled) startVisual();
         else { stopVisual(); setVisualNote(''); }
-      }
-      if (ch['bn.audioEnabled']) {
-        state.audio.enabled = ch['bn.audioEnabled'].newValue === true;
-        if (state.audio.enabled) startAudio();
-        else { stopAudio(); state.audio.res = null; setAudioTag(''); renderStream(); renderOutline(); }
       }
     });
   }

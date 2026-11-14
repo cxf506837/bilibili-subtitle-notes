@@ -144,12 +144,24 @@ async function ocrFrame(dataUrl) {
 
 // 轻量安装包（不带 vendor/ocr）里没有本地 OCR 运行时。内容脚本自己 fetch chrome-extension:// 会被
 // web_accessible_resources / 页面 CSP 挡住（实测拿不到），所以由 SW（扩展源）代探一次。
-const OCR_MARKER = 'vendor/ocr/models/ppocrv6_tiny_dict.txt';
+// 判据必须是「真正会被加载的那几个大文件」：dict.txt 只有 26KB 且在 git 里（clone 下来就有），
+// 只探它会得出「OCR 可用」的错误结论，用户点了按钮才失败 —— 这比没有按钮更糟。
+const OCR_MARKERS = [
+  'vendor/ocr/models/PP-OCRv6_tiny_det.ort',
+  'vendor/ocr/models/PP-OCRv6_tiny_rec.ort',
+  'vendor/ocr/ort/ort-wasm-simd-threaded.jsep.wasm',
+  'vendor/ocr/ort/ort-wasm-simd-threaded.jsep.mjs',
+  'vendor/ocr/ocr-bundle.js',
+];
+function ocrAvailable() {
+  return Promise.all(OCR_MARKERS.map((p) => fetch(chrome.runtime.getURL(p))
+    .then((r) => !!(r && r.ok), () => false))).then((rs) => rs.every(Boolean));
+}
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'probeOcr') {
-    fetch(chrome.runtime.getURL(OCR_MARKER))
-      .then((r) => sendResponse({ ok: !!(r && (r.ok || r.status === 200)) }))
+    ocrAvailable()
+      .then((ok) => sendResponse({ ok }))
       .catch(() => sendResponse({ ok: false }));
     return true;
   }
@@ -178,8 +190,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // v0.7.3 之前 manifest 里没有 action，装完根本找不到「用」的入口（只能在视频页等面板自己出来）。
 const VIDEO_URL = /^https:\/\/www\.bilibili\.com\/video\//;
 const CONTENT_FILES = [
-  'src/gate.js', 'src/summarize.js', 'src/align.js', 'src/hardsub.js',
-  'src/audio.js', 'src/frames.js', 'src/content.js',
+  'src/gate.js', 'src/summarize.js', 'src/hardsub.js', 'src/frames.js', 'src/content.js',
 ];
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }

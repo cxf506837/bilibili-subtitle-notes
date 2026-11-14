@@ -1,0 +1,19 @@
+{
+  "name": "bili-notes",
+  "version": "0.7.3",
+  "description": "B站 视频可核对笔记：每条结论都能点回原句",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/run-all.mjs",
+    "test:real-model": "node test/real-model.mjs",
+    "check:secrets": "node test/check-secrets.mjs",
+    "pack:full": "node test/zip.mjs",
+    "pack:lite": "node test/zip.mjs --lite",
+    "preview": "node test/preview-server.mjs 8799"
+  }
+}

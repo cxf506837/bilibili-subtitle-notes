@@ -29,3 +29,6 @@ vendor/ocr/models/*.ort
 .env
 *.key
 *.pem
+
+# 本机一次性探针/截图（不进仓库）
+_lab/

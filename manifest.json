@@ -48,9 +48,7 @@
       "js": [
         "src/gate.js",
         "src/summarize.js",
-        "src/align.js",
         "src/hardsub.js",
-        "src/audio.js",
         "src/frames.js",
         "src/content.js"
       ],

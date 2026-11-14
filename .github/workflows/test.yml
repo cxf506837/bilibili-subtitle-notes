@@ -1,0 +1,27 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # 全离线：不联网、不调模型、不花钱。realdata 用仓库里那份 60 条实测数据做回归。
+      - name: 单元测试 + 实测数据回归
+        run: node test/run-all.mjs
+      - name: 敏感信息扫描（本机路径 / 密钥）
+        run: node test/check-secrets.mjs
+      # 轻量包不需要 vendor/ocr，CI 里能直接打；完整包依赖 Release 附件里的 OCR 资源
+      - name: 打包自检（轻量包）
+        run: node test/zip.mjs --lite

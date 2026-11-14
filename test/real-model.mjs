@@ -1,12 +1,12 @@
 // 真模型冒烟：真字幕 fixture → 切块 → 真 DeepSeek 调用 → 校验。用来量真实延迟/通过率/质量。
-// 用法: node test/real-model.mjs [模型] [块数]   key 从 BN_KEY 或桌面 key 文件读
+// 用法: BN_KEY=sk-... node test/real-model.mjs [模型] [块数]
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 
 const MODEL = process.argv[2] || 'deepseek-flash';
 const NBLOCKS = Number(process.argv[3] || 3);
-const KEY_FILE = 'C:\\Users\\Admin\\Desktop\\开发专用key（保存好）.txt';
-const key = process.env.BN_KEY || readFileSync(KEY_FILE, 'utf8').trim();
+const key = process.env.BN_KEY || '';
+if (!key) { console.error('缺 BN_KEY 环境变量（随便一家 OpenAI 兼容服务的 key 都行）'); process.exit(2); }
 const fixture = readFileSync(new URL('./fixtures/sub-BV1GyZYYNErW.json', import.meta.url), 'utf8');
 const sumSrc = readFileSync(new URL('../src/summarize.js', import.meta.url), 'utf8');
 const ctx = createContext({ console });

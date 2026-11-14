@@ -1,0 +1,59 @@
+name: 字幕/笔记对不上（数据错误）
+description: 字幕拿错、闸门误判、引文和原句对不上。这类问题我一定看，请尽量填全。
+title: "[数据错误] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个项目的立身之本就是「不把别的视频的字幕写成你的笔记」，所以这类问题优先级最高。
+        为了能复现，没有 BV 号的报告我没法查——请一定填。
+  - type: input
+    id: bv
+    attributes:
+      label: 视频 BV 号或链接
+      description: 出问题的那个视频，例如 BV1GyZYYNErW
+      placeholder: BV1...
+    validations:
+      required: true
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: 面板上显示的闸门判定
+      description: 状态条那一行的原话
+      options:
+        - 多份取样一致（正常状态）
+        - 单次取样（未复核）
+        - 字幕内容不确定（取样不一致）
+        - 字幕和视频对不上
+        - 这个视频没有字幕 / 字幕轨为空
+        - 字幕只有一部分 / 字幕比视频还长
+        - 没出现状态条（直接就开始总结了）
+    validations:
+      required: true
+  - type: input
+    id: samples
+    attributes:
+      label: 取样了几次
+      description: 状态条里「取样 N 次」的 N；没写就填不知道
+      placeholder: "3"
+  - type: textarea
+    id: what
+    attributes:
+      label: 错在哪
+      description: |
+        是「字幕属于别的视频」、还是「字幕属于这个视频但内容不对」、还是「引文和原字幕句对不上」？
+        有截图最好（面板截图，不是整个屏幕）。
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 浏览器与版本
+      description: 例如 Edge 157.0.3606.21
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其它（模型、是否复现、诊断信息）
+      description: 面板上的报错文字、用的哪家模型、能稳定复现的话说明一下操作顺序
