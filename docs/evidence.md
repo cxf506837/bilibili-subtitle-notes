@@ -126,7 +126,7 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 
 真浏览器验证（2026-11-14，预览页 + 假数据）：起 `node test/preview-server.mjs 8799`，在浏览器里打开 `/video/BV1TESTPREVIEW`（假 chrome API + 60 句假字幕），把 `window.__bnState.notes` 清空后点面板上的「导出」——浏览器真的下载了 `光合作用 · 假数据预览.md`：6,671 字节 / 77 行 / 60 条 `- [mm:ss](链接) 原句` / frontmatter 里 `notes: transcript-only`。这证明「没有 AI 笔记 → 导出字幕全文」的分支在真实 DOM 里确实被走到。
 真扩展验证（2026-11-14，真 Edge 157 加载仓库根，真 B站 页面 https://www.bilibili.com/video/BV1twZ4YzEmv）：在内容脚本自己的执行上下文里调用 `window.__bnTranscriptMarkdown()`，拿到 **99,951 字节 / 1,407 行 / 1,390 条** `- [mm:ss](链接) 原句`，frontmatter 是 `source` / `title: 深度|| 香火之战，车迟国的教皇实验` / `subtitle_source: ai-zh` / `verified: single-sample` / `notes: transcript-only` / `exported`。也就是说分母不是空壳（旧行为下这里只有标题和 BV 号）。
-仍未验证：真扩展里「点面板上的导出按钮 → 浏览器落盘」这一步（下载行为本身是 `a[download]`，预览页里跑通过；真扩展里只验到 markdown 生成正确）。
+真扩展里点按钮落盘也验了（2026-11-14，CDP `Browser.setDownloadBehavior` + 真点 `#btnExport`）：真 Edge 里真的下载了 `我的世界克苏鲁全集：一口气看完.md`，**168,723 字节**，frontmatter 是 `verified: two-samples-agree` / `visual_frames: 6`，正文是带引文和时间戳的 AI 笔记（这个视频已经整理过，所以走的是笔记分支）。
 ## 九、出错时的一键诊断（W2-4）
 
 为什么要有：陌生人报「字幕拿不到」时，来回问「哪个视频 / 什么判定 / 什么端点」要花三四轮，很多人问一轮就走了。所以状态条不是绿色（warn 或 bad）时，面板会多出一个「复制诊断」，点一下拿到：
@@ -158,11 +158,23 @@ bili-notes ? · 2026-11-14T12:15:07.806Z
 
 版本号显示 `?` 是因为预览页的假 chrome 没有 `getManifest`；「端点 / 模型 / Key」那两行由 background 的 `diag` 消息提供，预览页没有这个假接口，所以只由单测覆盖。
 
-真扩展验证（2026-11-14，真 Edge）：正常态下 `#btnDiag` 带 `hidden` 类（不占位）；把状态切成 `warn` 后按钮立刻出现、`#statusText` 同步成 `字幕只有一部分（真机测试）`；`window.__bnCopyDiag()` 在真页面返回 Promise（真剪贴板写入没有等它，因为没有用户手势时 `navigator.clipboard.writeText` 会挂住，等下去会卡死自动化脚本）。所以「按钮该出现时就出现」这一半已真机验证；「点下去文字真的进了剪贴板」仍需人手点一次——这是现在最便宜的待验项，任何人装完点一下就知道。
+真扩展验证（2026-11-14，真 Edge）：正常态下 `#btnDiag` 带 `hidden` 类（不占位）；把状态切成 `warn` 后按钮立刻出现（实测位置 1250,45、宽 61×23）、`#statusText` 同步成 `字幕只有一部分（真机测试）`。
+
+**点击也验了**：CDP 给 `https://www.bilibili.com` 授予 `clipboardReadWrite`，`Page.bringToFront` 让文档获得焦点，再用 `Input.dispatchMouseEvent` 在按钮坐标上真点一下 → 状态条变成「诊断信息已复制，贴到 issue 里就行」，剪贴板里读回来的原文是：
+
+```
+bili-notes 1.0.0 · 2026-11-14T12:28:29.839Z
+页面: https://www.bilibili.com/video/BV1GyZYYNErW/
+标题: 我的世界克苏鲁全集：一口气看完
+字幕: stable · ai-zh · 2132 句
+状态: warn
+```
+
+顺带验到一条真实的失败路径：文档没有焦点时剪贴板写不进去，面板会显示「复制失败：请截图这段面板状态」——这是设计好的兜底，不是崩溃。（`navigator.clipboard.readText` 在无焦点时抛 `Document is not focused`，所以自动化要先 `Page.bringToFront`。）
 ## 十、还没验证的（别当成全跑通了）
 
 - 除 DeepSeek 之外厂商（OpenAI / 通义 / 智谱 / Moonshot）的真实调用、限流、超长视频下的成本。
-- 真扩展里点「导出」/「复制诊断」这两次真实点击（生成逻辑都验过了，落盘与剪贴板没验）。
+- 真扩展里的两次真实点击**已补验**（导出入 168,723 字节的 .md、诊断文本进了剪贴板，见第八、九节）；剩下的与点击无关。
 - 画面字幕在「手写板书 / 极长单句 / 字幕贴画面中部」的视频上；
 - 画面字幕的错字率没有量化过（只有耶鲁公开课一条人工看过）。
 - 投票防不住「某次接口连着 3 次返回同一份错文件」（原理上防不住，目前没样本）。
