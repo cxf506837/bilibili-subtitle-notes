@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>B站可核对笔记 · 设置</title>
+<style>
+  body { font: 14px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 620px; margin: 40px auto; padding: 0 20px; color: #18191c; }
+  h1 { font-size: 18px; }
+  label { display: block; margin: 16px 0 4px; font-weight: 600; }
+  input, select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+  .hint { color: #888; font-size: 12px; margin-top: 4px; }
+  button { margin-top: 20px; padding: 8px 18px; border: 0; border-radius: 6px; background: #00aeec; color: #fff; font-size: 14px; cursor: pointer; }
+  #msg { margin-top: 12px; font-size: 13px; white-space: pre-wrap; }
+  .row { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-top: 8px; }
+  .row input { width: auto; }
+  .warn { background: #fff6e5; border-left: 3px solid #f0a020; padding: 10px 12px; margin-top: 24px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>B站可核对笔记</h1>
+
+<label for="apiBase">API Base（OpenAI 兼容）</label>
+<input id="apiBase" placeholder="https://api.deepseek.com/v1" />
+<div class="hint">填到 /v1 为止，不要带 /chat/completions。</div>
+
+<label for="model">模型</label>
+<input id="model" placeholder="deepseek-chat" />
+
+<label for="apiKey">API Key</label>
+<input id="apiKey" type="password" placeholder="sk-..." />
+<div class="hint">Key 只存在本机浏览器 chrome.storage.local，不上传到任何服务器；只在你自己的请求里发给上面这个 API Base。</div>
+
+<label for="maxTokens">单次输出上限</label>
+<input id="maxTokens" type="number" value="700" />
+
+<label>走神提示</label>
+<label class="row"><input type="checkbox" id="awayEnabled" checked /> 切走标签页超过 90 秒、或暂停超过 2 分钟，回来时给一条「展开补课」提示（只记时间戳，不记你去了哪里）</label>
+
+<label>画面文字（PPT / 板书）</label>
+<label class="row"><input type="checkbox" id="visualEnabled" checked /> 自动截取稳定的画面并本地识别文字，作为理解辅助（识别在本机跑，不联网、不花钱；低分辨率视频会自动跳过）</label>
+
+<label>音画对齐（字幕时间自检）</label>
+<label class="row"><input type="checkbox" id="audioEnabled" /> 播放时顺便量一下音量，判断字幕时间有没有整体偏、或者越走越偏（只算音量大小，不录音、不转写、不上传）。<b>默认关</b>：B站 AI 字幕几乎句句相接，这种情况判不出偏移；只有你怀疑字幕时间不对（人工字幕、重剪过的视频）时再打开</label>
+
+<button id="save">保存</button>
+<button id="test" style="background:#666">测试连接</button>
+<div id="msg"></div>
+
+<div class="warn">
+  已知限制：字幕来自 B站 的 AI 字幕接口，同一视频多次请求可能返回不同的文件（本项目靠「三次取样、两次一致」来挡）。
+  状态条里写「两次取样一致」只代表取样稳定，<b>不代表内容一定属于这个视频</b>。
+</div>
+
+<script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# 构建产物与调试档：可重新生成，体积大（dist 里含 Edge 调试 profile 1.5GB）
+dist/
+node_modules/
+test/ocr/build/
+
+# 日志
+*.log
+
+# 系统杂物
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 仅本机用的脚本与交接记录：留在磁盘上，但不进公开仓库
+HANDOFF-*.md
+start-edge*.ps1
+start-edge-user.cmd
+sync-my-edge.ps1
+edge-safe.ps1
+bili-notes-my/
+
+# OCR 资源（wasm + 模型，合计 97.7MB）：不进仓库，改由 Release 分发
+# 本机文件仍留在磁盘上；新克隆需先下载（见 README「画面识别（可选）」）
+test/ocr/
+vendor/ocr/ort/*.wasm
+vendor/ocr/models/*.ort
+
+# 本地密钥（永远不要提交）
+.env
+*.key
+*.pem

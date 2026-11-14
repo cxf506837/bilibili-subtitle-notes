@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>浮层预览（假数据）</title>
+<style>
+  body { margin: 0; font: 14px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f6f7f8; color: #18191c; }
+  .page { max-width: 820px; padding: 40px; }
+  .stage { width: 640px; height: 360px; background: #111; color: #888; display: flex; align-items: center; justify-content: center; font-size: 13px; border-radius: 8px; }
+  .tip { margin-top: 16px; color: #666; font-size: 13px; }
+  video { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 style="font-size:20px">浮层预览 · 全部是假数据</h1>
+  <div class="stage" id="stage">模拟播放器（假）</div>
+  <div class="tip">时间会自动往前走，用来验证「跟播放头出笔记」这条链路。右侧浮层是扩展的 content.js 真实渲染结果。</div>
+</div>
+<video id="fake" muted playsinline style="width:320px;height:180px;background:#000"></video>
+<script>
+// ---- 假 chrome API ----
+window.chrome = {
+  storage: { local: {
+    get: function (keys, cb) { cb({}); },
+    set: function () {},
+  } },
+  runtime: {
+    lastError: null,
+    openOptionsPage: function () {},
+    sendMessage: function (msg, cb) {
+      if (msg.type === 'ocr') {
+        // 假 OCR：模拟「同一张幻灯片反复识别」和「翻页后新文字」
+        var s = (typeof SLIDES !== 'undefined' && typeof PV_SLIDE !== 'undefined') ? SLIDES[PV_SLIDE.idx % SLIDES.length] : '假 OCR 文字 光合作用 光反应';
+        setTimeout(function () { cb({ ok: true, text: s, lines: 4, confidence: 0.91 }); }, 120);
+        return;
+      }
+      if (msg.type === 'chat') {
+        const user = msg.messages[1].content;
+        // 小节标题请求：和「每块笔记」共用同一个 chat 通道，靠提示词区分
+        if (user.indexOf('这一节的时间范围') !== -1) {
+          setTimeout(function () {
+            cb({ ok: true, content: JSON.stringify({ title: '光反应的过程', one_line: '光反应把光能变成化学能' }), usage: { prompt_tokens: 150, completion_tokens: 24 } });
+          }, 120);
+          return;
+        }
+        const row = user.split('\n').find(function (l) { return /^\d+\|/.test(l); }) || '';
+        const parts = row.split('|');
+        const sid = Number(parts[0]);
+        const from = Number(parts[1]);
+        const content = parts.slice(2).join('|');
+        const quote = content.replace(/[。，]$/, '').slice(0, 18);
+        const payload = {
+          block_summary: '这一小段在讲光合作用的光反应',
+          points: [{
+            quote: quote,
+            sentence_ids: [sid],
+            start: from,
+            end: from + 5,
+            plain: '光反应把光能变成化学能',
+            kind: 'conclusion',
+            terms: [{ term: '光反应', plain: '用光发电的那一步' }],
+            analogy: null,
+          }],
+          one_thing: '记住光反应发生在类囊体膜上',
+        };
+        setTimeout(function () { cb({ ok: true, content: JSON.stringify(payload), usage: { prompt_tokens: 380, completion_tokens: 96 } }); }, 260);
+        return;
+      }
+      cb({ ok: false, error: 'preview' });
+    },
+  },
+};
+
+// ---- 假画面：canvas 流喂给 <video>，这样 frames.js 能真的 drawImage 截帧 ----
+var PV_SLIDE = { text: '光合作用 光反应 暗反应 类囊体膜 叶绿素', idx: 0 };
+var SLIDES = [
+  '光合作用 第三节 光反应 暗反应 类囊体膜 叶绿素 氧气释放',
+  '光饱和点 限制因素 二氧化碳浓度 通风 补光 电费成本',
+  '光合午休 气孔开度 土壤含水量 净光合速率 呼吸作用',
+];
+(function () {
+  var cv = document.createElement('canvas');
+  cv.width = 1280; cv.height = 720;
+  var cx = cv.getContext('2d');
+  function draw() {
+    cx.fillStyle = '#f3f4ef'; cx.fillRect(0, 0, 1280, 720);
+    cx.fillStyle = '#1a1a1a'; cx.font = 'bold 54px "Microsoft YaHei"';
+    var s = SLIDES[PV_SLIDE.idx % SLIDES.length];
+    var words = s.split(' ');
+    for (var i = 0; i < words.length; i++) cx.fillText(words[i], 90, 160 + i * 90);
+    cx.fillStyle = '#999'; cx.font = '28px monospace';
+    cx.fillText(new Date().toLocaleTimeString(), 90, 660);
+  }
+  draw();
+  window.PV_SLIDE = PV_SLIDE;
+  window.pvNextSlide = function () { PV_SLIDE.idx++; draw(); };
+  var drawTimer = setInterval(draw, 700); // 时间在变 ⇒ 每 700ms 画面会轻微变化
+  window.pvFreeze = function () { clearInterval(drawTimer); drawTimer = 0; draw(); }; // 让画面静止，方便验证「稳定 2 拍才截帧」
+  window.pvThaw = function () { if (!drawTimer) drawTimer = setInterval(draw, 700); };
+  var stream = cv.captureStream(10);
+  var v0 = document.getElementById('fake');
+  v0.srcObject = stream;
+  v0.play().catch(function () {});
+  window.__pvCanvas = cv;
+})();
+
+// ---- 假视频 + 假闸门 ----
+var FAKE_TIME = 0;
+var v = document.getElementById('fake');
+Object.defineProperty(v, 'currentTime', { get: function () { return FAKE_TIME; }, set: function (x) { FAKE_TIME = x; } });
+Object.defineProperty(v, 'paused', { get: function () { return false; } });
+v.play = function () { return Promise.resolve(); };
+
+var TOPICS = [
+  '光合作用是植物把光能转成化学能的过程。',
+  '它分成光反应和暗反应两个阶段。',
+  '光反应发生在类囊体膜上。',
+  '叶绿素吸收红光和蓝紫光最多。',
+  '水在这里被分解，放出氧气。',
+  '同时生成了 ATP 和 NADPH。',
+  '暗反应在叶绿体基质里进行。',
+  '二氧化碳在这里被固定成三碳化合物。',
+  '这个过程叫卡尔文循环。',
+  '每一步都要酶来催化。',
+  '温度会影响酶的活性。',
+  '所以夏天中午光合速率反而会下降。',
+  '这叫光合午休现象。',
+  '呼吸作用则相反，消耗有机物。',
+  '两者的差值叫净光合速率。',
+  '测净光合常用氧气释放量。',
+  '也可以用二氧化碳吸收量。',
+  '光照强度到某个点后速率不再上升。',
+  '这个点叫光饱和点。',
+  '这时候限制因素变成了二氧化碳浓度。',
+  '农业生产里靠通风来提高产量。',
+  '大棚里还会补光。',
+  '补光要考虑电费成本。',
+  '红光补光效率通常最高。',
+  '说完光合作用，我们再看看别的影响因素。',
+  '土壤含水量会间接影响气孔开度。',
+  '气孔一关，二氧化碳就进不来。',
+  '所以缺水也会让光合变慢。',
+  '这一节的重点就这些。',
+  '下一节我们讲呼吸作用的具体步骤。',
+];
+// 把 19 句扩到 60 句（共 300 秒），这样能有十几个块，方便验证「跳过的区间画虚线」。
+var ALL = [];
+for (var k = 0; k < 60; k++) ALL.push(TOPICS[k % TOPICS.length]);
+var sentences = ALL.map(function (text, i) {
+  return { sid: i, from: i * 5, to: i * 5 + 4.8, content: text };
+});
+
+window.BnGate = {
+  resolveVideo: function () {
+    return Promise.resolve({ bvid: 'BV1TESTPREVIEW', aid: 1, cid: 2, title: '光合作用 · 假数据预览', pageDur: 300, pages: 1, tname: '知识' });
+  },
+  gateSubtitle: function () {
+    // ?v=noSubs / rejected / ambiguous / truncated ... 用来看各种失败态文案（零成本）
+    var v = (new URLSearchParams(location.search).get('v') || '').trim();
+    if (v) {
+      return Promise.resolve({ verdict: v, reason: 'preview', votes: 0, attempts: [{ state: 'preview' }], track: null, sentences: [] });
+    }
+    return Promise.resolve({ verdict: 'stable', track: { lan: 'ai-zh' }, sentences: sentences, stats: { cover: 0.98 } });
+  },
+};
+</script>
+<script src="../src/summarize.js"></script>
+<script src="../src/align.js"></script>
+<script src="../src/hardsub.js"></script>
+<script src="../src/audio.js"></script>
+<script src="../src/frames.js"></script>
+<script src="../src/content.js"></script>
+<script>
+// 自动推进时间：每 300ms 前进 2 秒（约 7 倍速）。
+// 注意：content.js 只有在「连续播放」（相邻两次 timeupdate 间隔 ≤3 秒）时才记覆盖，
+// 所以这里每步必须 ≤3 秒，否则整片都会被当成跳转，一条笔记都不出。
+window.PV = { playing: true };
+setInterval(function () {
+  if (!window.PV.playing) return;
+  FAKE_TIME += 2;
+  if (FAKE_TIME > 300) { FAKE_TIME = 0; }
+  v.dispatchEvent(new Event('timeupdate'));
+}, 300);
+// 让测试脚本能模拟「拖动进度条」
+window.pvSeek = function (t) { FAKE_TIME = t; v.dispatchEvent(new Event('timeupdate')); };
+window.pvPause = function () { window.PV.playing = false; };
+window.pvResume = function () { window.PV.playing = true; };
+window.pvNow = function () { return FAKE_TIME; };
+
+// ---- 走神模拟：走真实的 visibilitychange / pause 分支，只把「真实过了多久」用时钟偏移造出来 ----
+window.pvAwayWhilePlaying = function (wallMs, videoAdvance) {
+  var adv = videoAdvance == null ? 120 : videoAdvance;
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: function () { return 'hidden'; } });
+  document.dispatchEvent(new Event('visibilitychange'));
+  // 标签页隐藏但视频还在播：笔记照常生成（每步 2 秒，仍是连续播放）
+  for (var i = 0; i < Math.ceil(adv / 2); i++) { FAKE_TIME += 2; v.dispatchEvent(new Event('timeupdate')); }
+  window.__bnAway.skew(wallMs);
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: function () { return 'visible'; } });
+  document.dispatchEvent(new Event('visibilitychange'));
+  window.__bnAway.skew(0);
+};
+window.pvPauseFor = function (wallMs) {
+  window.PV.playing = false;
+  v.dispatchEvent(new Event('pause'));
+  window.__bnAway.skew(wallMs);
+  v.dispatchEvent(new Event('play'));
+  window.__bnAway.skew(0);
+  window.PV.playing = true;
+};
+window.pvSeen = function () { return window.__bnAway.spans(); };
+// ---- 画面通道：翻到下一张幻灯片（触发 scene 变化 → 截帧 → OCR） ----
+window.pvNextSlide = window.pvNextSlide || function () {};
+window.pvVisual = function () { return window.__bnVisual ? window.__bnVisual.stats() : null; };
+</script>
+</body>
+</html>
