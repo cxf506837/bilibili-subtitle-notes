@@ -81,7 +81,27 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 - 错字会进原话（读的是像素），数字、人名、公式最容易错；40 条样本里肉眼可见错字 3~5 处，不影响理解。
 - OCR 引擎对比：tesseract.js（chi_sim_best）在 1080p 课件帧上基本不可用（正文被认成「在三角形 4BC 中，已知 w，D，4」），换 PP-OCRv6 tiny（ONNX Runtime Web + wasm）后同一帧几乎全对，初始化 270ms、单帧 1.3~1.5 秒，全在本机。
 
-## 七、还没验证的（别当成全跑通了）
+## 七、设置页的端点白名单（W2-1）
+
+为什么要在保存时拦：MV3 里对**没在 `host_permissions` 声明过**的域名发 `fetch`，只会抛 `TypeError: Failed to fetch`——和断网、DNS 错、Key 错是同一句话。事后再想区分已经不可能，所以必须在用户点「保存」那一刻拦下来，并告诉他能用哪几家。
+
+| 检查 | 行为 | 对应断言 |
+| --- | --- | --- |
+| 预设 6 家都在 manifest 里 | 选了预设就一定能保存 | endpoint 6 条 |
+| 协议不符（只有 https 权限时填 http） | 拦 | endpoint 1 条 |
+| 后缀伪装 `api.deepseek.com.evil.com` | 拦 | endpoint 1 条 |
+| 前缀伪装 `evilapi.deepseek.com` | 拦 | endpoint 1 条 |
+| 通配 `*.deepseek.com` | 命中裸域与子域，不吃伪装域 | endpoint 4 条 |
+| 没权限的域名点保存 | 不写 storage + 报错点名域名 + 列出允许名单 | options 4 条 |
+| 没权限的域名点「测试连接」 | 不发请求，同一道校验 | options 2 条 |
+| 空 Key 点「测试连接」 | 先提示填 Key，不发请求 | options 2 条 |
+
+配置：`http://localhost/*` 与 `http://127.0.0.1/*` 已在 manifest 里（本机 Ollama / vLLM），端口不影响判定。
+
+变异测试：把 `src/options.js` 里两道 `if (!allow.ok) return show(originError(allow), true);` 删掉后重跑 `test/options.test.mjs`，6 条变红；恢复后 21 条全绿。
+
+`node test/run-all.mjs` 现在 **222 条断言**（原 171 + endpoint 30 + options 21），不需要网络、不花钱。
+## 八、还没验证的（别当成全跑通了）
 
 - 除 DeepSeek 之外厂商（OpenAI / 通义 / 智谱 / Moonshot）的真实调用、限流、超长视频下的成本。
 - 画面字幕在「手写板书 / 极长单句 / 字幕贴画面中部」的视频上；

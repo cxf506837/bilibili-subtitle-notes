@@ -10,6 +10,8 @@ const FILES = [
   'visual.test.mjs',      // 画面文字挂载
   'hardsub.test.mjs',     // 画面字幕：裁带 / 清洗 / 拼句
   'pipeline.test.mjs',    // 切块 → prompt → 校验
+  'endpoint.test.mjs',    // 设置页端点白名单
+  'options.test.mjs',     // 设置页真实代码路径（假 DOM）
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

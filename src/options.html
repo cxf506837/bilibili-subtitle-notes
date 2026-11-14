@@ -19,6 +19,12 @@
 <body>
 <h1>B站可核对笔记</h1>
 
+<label for="preset">服务商预设</label>
+<select id="preset">
+  <option value="">自定义（自己在下面填）</option>
+</select>
+<div class="hint">选预设会自动填好 API Base 和模型；已经填过的 Key 不会被改动。</div>
+
 <label for="apiBase">API Base（OpenAI 兼容）</label>
 <input id="apiBase" placeholder="https://api.deepseek.com/v1" />
 <div class="hint">填到 /v1 为止，不要带 /chat/completions。</div>
@@ -39,7 +45,6 @@
 <label>画面文字（PPT / 板书）</label>
 <label class="row"><input type="checkbox" id="visualEnabled" checked /> 自动截取稳定的画面并本地识别文字，作为理解辅助（识别在本机跑，不联网、不花钱；低分辨率视频会自动跳过）</label>
 
-<label>音画对齐（字幕时间自检）</label>
 
 <button id="save">保存</button>
 <button id="test" style="background:#666">测试连接</button>
@@ -50,6 +55,7 @@
   状态条里写「两次取样一致」只代表取样稳定，<b>不代表内容一定属于这个视频</b>。
 </div>
 
+<script src="endpoint.js"></script>
 <script src="options.js"></script>
 </body>
 </html>

@@ -34,11 +34,11 @@ async function fetchSubtitleFile(url) {
 
 async function readConfig(override) {
   const cfg = await chrome.storage.local.get(['apiBase', 'apiKey', 'model', 'maxTokens']);
-  const apiBase = (override && override.apiBase) || cfg.apiBase || 'https://api.openai.com/v1';
+  const apiBase = (override && override.apiBase) || cfg.apiBase || 'https://api.deepseek.com/v1';
   return {
     apiBase: String(apiBase).replace(/\/+$/, ''),
     apiKey: (override && override.apiKey) || cfg.apiKey || '',
-    model: (override && override.model) || cfg.model || 'gpt-4o-mini',
+    model: (override && override.model) || cfg.model || 'deepseek-chat',
     maxTokens: Number((override && override.maxTokens) || cfg.maxTokens || 1000),
   };
 }

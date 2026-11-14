@@ -37,5 +37,6 @@ node test/zip.mjs --lite   # 轻量
 ## 需要的前置条件
 
 - **登录 B站**：未登录时字幕接口返回 0 轨（`need_login_subtitle: true`）。这不是可选优化。
-- **一个 OpenAI 兼容的 API**：填 API Base（到 `/v1`）、模型名、Key。DeepSeek 填 `https://api.deepseek.com/v1` + `deepseek-flash`。Key 只存 `chrome.storage.local`，只发给你填的端点。
+- **一个 OpenAI 兼容的 API**：设置页第一项是「服务商预设」，选一家会自动填好 API Base（到 `/v1` 为止）和模型名，你只需要填 Key。预设 6 家：DeepSeek / OpenAI / 通义千问（`dashscope.aliyuncs.com/compatible-mode/v1`）/ 智谱 GLM（`open.bigmodel.cn/api/paas/v4`）/ Moonshot / 本机 Ollama（`http://localhost:11434/v1`）。Key 只存 `chrome.storage.local`，只发给你填的端点。
+- **为什么不能顺手填别家的域名**：浏览器扩展只能连 `manifest.json` 里声明过的域名。对没声明的域名发请求，MV3 只会给你一句 `TypeError: Failed to fetch`，和断网、DNS 错、Key 错**长得一模一样**。所以保存时就会拦下来，并告诉你现在允许哪几家——而不是让你去猜那句「请求失败」是什么意思。要加服务商请开 issue。
 - **画面文字 / 画面字幕要 720p 以上**：截的是视频解码像素（不是屏幕截图，面板和弹幕不会被截进去），但 360p 正文只有 8~10 像素高，OCR 认不出来；480p 会被明确拒绝。未登录时 B站 最高 480p。

@@ -17,7 +17,9 @@
     "https://api.deepseek.com/*",
     "https://dashscope.aliyuncs.com/*",
     "https://open.bigmodel.cn/*",
-    "https://api.moonshot.cn/*"
+    "https://api.moonshot.cn/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "src/background.js"

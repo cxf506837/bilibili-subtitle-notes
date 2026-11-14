@@ -10,16 +10,16 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、171 条离线测试）见 [docs/evidence.md](docs/evidence.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、222 条离线测试）见 [docs/evidence.md](docs/evidence.md)。
 
 ## 装（约 3 分钟）
 
 1. 先**登录 B站**（未登录时字幕接口返回 0 轨）。
 2. 打开 `edge://extensions`（Chrome 是 `chrome://extensions`），打开右上角「开发人员模式」。
 3. 点「加载解压缩的扩展」，选本仓库根目录（有 `manifest.json` 的那一层）。
-4. 点工具栏拼图图标把「B站可核对笔记」钉出来；打开任意视频页点它，按「设置」填 API Base / 模型 / Key。
+4. 点工具栏拼图图标把「B站可核对笔记」钉出来；打开任意视频页点它，按「设置」选一家服务商（预设会自动填好 API Base 和模型），再填 Key。
 
-任何 OpenAI 兼容端点都行（DeepSeek / 通义 / 智谱 / Moonshot / OpenAI）。不想自己打包的话，[Releases](https://github.com/cxf506837/bilibili-subtitle-notes/releases) 里有打好的 zip（完整版带本地 OCR，轻量版 60 KB）。装不上、图标灰着、Key 存不住 → [docs/install.md](docs/install.md)。
+设置页内置 6 家预设：DeepSeek / OpenAI / 通义千问 / 智谱 GLM / Moonshot / 本机 Ollama。填**别的**域名会在保存时被挡——浏览器扩展只能连 `manifest.json` 里声明过的域名，没声明的域名在 MV3 里只会报一句 `TypeError: Failed to fetch`，分不清是断网、Key 错还是没权限，所以干脆在保存那一步就说清楚。想加服务商请开 issue。不想自己打包的话，[Releases](https://github.com/cxf506837/bilibili-subtitle-notes/releases) 里有打好的 zip（完整版带本地 OCR，轻量版 60 KB）。装不上、图标灰着、Key 存不住 → [docs/install.md](docs/install.md)。
 
 ## 用
 
@@ -42,7 +42,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 171 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 222 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```
