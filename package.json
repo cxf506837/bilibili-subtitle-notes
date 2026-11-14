@@ -1,6 +1,6 @@
 {
   "name": "bili-notes",
-  "version": "0.7.3",
+  "version": "1.0.0",
   "description": "B站 视频可核对笔记：每条结论都能点回原句",
   "private": true,
   "license": "MIT",

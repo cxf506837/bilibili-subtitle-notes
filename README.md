@@ -1,5 +1,7 @@
 # B站 可核对笔记
 
+[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 269 条离线测试 · MIT
+
 跟播放头边看边写；每条结论都带**逐字引文 + 可点的时间**，点一下跳回原句。浏览器扩展（Edge / Chrome，MV3）。
 
 ## 为什么不缺一个「AI 总结视频」

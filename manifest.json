@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "B站可核对笔记",
-  "version": "0.7.3",
+  "version": "1.0.0",
   "description": "跟着播放头边看边写，每条结论能点回原句。",
   "permissions": [
     "storage",
