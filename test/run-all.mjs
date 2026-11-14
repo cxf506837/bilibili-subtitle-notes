@@ -12,6 +12,7 @@ const FILES = [
   'pipeline.test.mjs',    // 切块 → prompt → 校验
   'endpoint.test.mjs',    // 设置页端点白名单
   'options.test.mjs',     // 设置页真实代码路径（假 DOM）
+  'transcript.test.mjs', // 无 Key 时的字幕全文导出
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

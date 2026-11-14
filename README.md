@@ -10,7 +10,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、222 条离线测试）见 [docs/evidence.md](docs/evidence.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、249 条离线测试）见 [docs/evidence.md](docs/evidence.md)。
 
 ## 装（约 3 分钟）
 
@@ -18,6 +18,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 2. 打开 `edge://extensions`（Chrome 是 `chrome://extensions`），打开右上角「开发人员模式」。
 3. 点「加载解压缩的扩展」，选本仓库根目录（有 `manifest.json` 的那一层）。
 4. 点工具栏拼图图标把「B站可核对笔记」钉出来；打开任意视频页点它，按「设置」选一家服务商（预设会自动填好 API Base 和模型），再填 Key。
+   不想申请 Key 也行：字幕抓稳后直接点「导出」，得到逐句字幕全文（第 4 步之外的部分照常用）。
 
 设置页内置 6 家预设：DeepSeek / OpenAI / 通义千问 / 智谱 GLM / Moonshot / 本机 Ollama。填**别的**域名会在保存时被挡——浏览器扩展只能连 `manifest.json` 里声明过的域名，没声明的域名在 MV3 里只会报一句 `TypeError: Failed to fetch`，分不清是断网、Key 错还是没权限，所以干脆在保存那一步就说清楚。想加服务商请开 issue。不想自己打包的话，[Releases](https://github.com/cxf506837/bilibili-subtitle-notes/releases) 里有打好的 zip（完整版带本地 OCR，轻量版 60 KB）。装不上、图标灰着、Key 存不住 → [docs/install.md](docs/install.md)。
 
@@ -26,6 +27,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 面板跟着播放头走：跨过一段末尾才写这一段，没看过的地方不写、不剧透
 - 跳过的区间画成虚线占位条：要么「总结这段」（花钱），要么「去看这段」
 - 「导出」出 Markdown（frontmatter + 时间戳 + 可点链接），直接进 Obsidian
+- **没填 API Key 也能用**：抓完字幕直接点「导出」，拿到的是逐句字幕全文（每句一个时间戳、可点回原句），只是没有 AI 整理的结论
 - 关掉页面再打开，笔记从 IndexedDB 原样恢复，不重跑闸门、不重复花钱
 - 失败会说清是哪一种：没有字幕 / 字幕只有一部分 / 字幕和视频对不上 / 没登录 / 清晰度太低 …
 
@@ -42,7 +44,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 222 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 249 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```

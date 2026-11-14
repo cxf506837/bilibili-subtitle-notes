@@ -160,7 +160,7 @@
     '</div>',
     '<div class="acts">',
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▾</button>',
-    '<button class="btn" id="btnExport" title="把当前笔记导出成 Markdown">导出</button>',
+    '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
     '<button class="btn hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
     '<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
     '<button class="btn accent" id="btnFold" title="收起右侧笔记面板">收起 ▸</button>',
@@ -1396,7 +1396,12 @@
         // 重试用尽：把这块放回队首，别静默吞掉（用户点「再试一次」或稍后自动继续都能补上）
         state.queue.unshift(block);
         state.queueHold = true;
-        setStatus('bad', '模型调用失败：' + (res.error || '') + '（已暂停，点「继续整理」重试）', res.error);
+        if (res.code === 'no-key') {
+          // 没填 Key 不是「故障」：字幕已经拿稳了，告诉他能直接把它导出去，而不是让他以为产品坏了。
+          setStatus('bad', '还没填 API Key：现在点「导出」能拿到字幕全文（' + state.sentences.length + ' 句，带时间戳）；想变成带引文的结论就点「设置」填一个', res.error);
+        } else {
+          setStatus('bad', '模型调用失败：' + (res.error || '') + '（已暂停，点「继续整理」重试）', res.error);
+        }
         scheduleRender();
         state.busy = false;
         return;
@@ -1945,12 +1950,33 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
   }
 
+  // 没配 API Key 时也不给死路：导出的就是这份已经过闸门的字幕本身。
+  // 用户装完扩展、还没去申请 Key，也能立刻拿到能带走的东西（606 star 的那个项目正是靠这个入口）。
+  function buildTranscriptMarkdown() {
+    const m = state.meta || {};
+    const total = Number(m.pages) || 0;
+    const pno = Number(m.page) || state.p || 1;
+    const heading = (m.title || state.bvid) + (total > 1 ? '（P' + pno + '/' + total + (m.part ? ' · ' + m.part : '') + '）' : '');
+    return S.transcriptMarkdown(state.sentences, {
+      url: pageUrl(),
+      title: heading,
+      totalPages: total,
+      page: pno,
+      part: m.part || '',
+      trackLan: state.trackLan || '',
+      ocr: state.verdict === 'hardsub' || state.trackLan === 'onscreen-ocr',
+      verified: state.verdict === 'stable' ? 'two-samples-agree' : 'single-sample',
+      jumpUrl: jumpUrl,
+    });
+  }
+
   function exportMarkdown() {
-    downloadMarkdown(buildMarkdown());
+    downloadMarkdown(state.notes.length ? buildMarkdown() : buildTranscriptMarkdown());
   }
 
   // 调试/验证用：不经下载直接拿到导出的 Markdown 文本
   window.__bnMarkdown = buildMarkdown;
+  window.__bnTranscriptMarkdown = buildTranscriptMarkdown;
   // 调试：预览页里直接检查/触发小节（真机上小节靠播够 8 块自动生成）
   window.__bnSections = {
     run: maybeSections,

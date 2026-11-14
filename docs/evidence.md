@@ -100,8 +100,28 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 
 变异测试：把 `src/options.js` 里两道 `if (!allow.ok) return show(originError(allow), true);` 删掉后重跑 `test/options.test.mjs`，6 条变红；恢复后 21 条全绿。
 
-`node test/run-all.mjs` 现在 **222 条断言**（原 171 + endpoint 30 + options 21），不需要网络、不花钱。
-## 八、还没验证的（别当成全跑通了）
+`node test/run-all.mjs` 现在 **249 条断言**（原 171 + endpoint 30 + options 21 + transcript 27），不需要网络、不花钱。
+## 八、没配 API Key 也能拿到字幕全文（W2-3）
+
+为什么要有这条：闸门跑完的那一刻，字幕已经在手里了，但以前只有模型返回之后才有「笔记」，所以没填 Key 的用户点「导出」得到的是一份只有标题和 BV 号的空文件——看起来像产品坏了。
+
+现在的行为：点「导出」时如果还没有任何 AI 笔记，导出的是**字幕全文**。
+
+| 检查 | 行为 | 对应断言 |
+| --- | --- | --- |
+| frontmatter | `notes: transcript-only`、`source`、`subtitle_source`、`verified` 都写上 | transcript 4 条 |
+| 逐句 | 每句一行 `- [mm:ss](可点链接) 原句` | transcript 2 条 |
+| 时间格式 | 61.4 秒 → `01:01`；3725 秒 → `62:05`（分钟不封顶，不写成 `01:02:05`） | transcript 2 条 |
+| 多 P | 写 `page: 2/5` 与 `part`，标题带「（P2/5 · 下半场）」 | transcript 2 条 |
+| 句内换行 | 压成一行，避免 Markdown 列表断成半句 | transcript 1 条 |
+| 画面字幕来源 | 额外写 `subtitle_note: 画面字幕识别，可能有错字` | transcript 2 条 |
+| 空字幕 | 不崩，正文写清「可能未登录 / 作者没开 AI 字幕 / 接口没返回」 | transcript 2 条 |
+| 缺参数 | `sentences` 为 null 不抛异常；没有跳转函数时退化成 `#t=5` | transcript 2 条 |
+
+状态条文案也改了：队列因为 `no-key` 停下时，不再说「模型调用失败」，而是「还没填 API Key：现在点「导出」能拿到字幕全文（N 句，带时间戳）；想变成带引文的结论就点「设置」填一个」。
+
+未验证：这条路径在真浏览器里点按钮那次没有被自动测到（`test/transcript.test.mjs` 只测纯函数与格式），需要一次真机点按确认。
+## 九、还没验证的（别当成全跑通了）
 
 - 除 DeepSeek 之外厂商（OpenAI / 通义 / 智谱 / Moonshot）的真实调用、限流、超长视频下的成本。
 - 画面字幕在「手写板书 / 极长单句 / 字幕贴画面中部」的视频上；

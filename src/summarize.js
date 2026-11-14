@@ -294,6 +294,53 @@
     return { title, oneLine: one.slice(0, 40) };
   }
 
+
+  // 没配 API Key 时的导出：字幕全文（逐句 + 时间戳 + 可点链接），不经模型。
+  // 放在纯函数层是为了能单测：输出格式一旦错，用户就会拿到一份没人看得懂的 Markdown。
+  function fmtTime(sec) {
+    const s = Math.max(0, Math.floor(Number(sec) || 0));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function transcriptMarkdown(sentences, meta) {
+    const m = meta || {};
+    const list = Array.isArray(sentences) ? sentences : [];
+    const jump = typeof m.jumpUrl === 'function' ? m.jumpUrl : (t) => '#t=' + Math.floor(Number(t) || 0);
+    const out = [];
+    out.push('---');
+    out.push('source: ' + (m.url || ''));
+    out.push('title: ' + (m.title || ''));
+    if (Number(m.totalPages) > 1) {
+      out.push('page: ' + Number(m.page) + '/' + Number(m.totalPages));
+      if (m.part) out.push('part: ' + m.part);
+    }
+    out.push('subtitle_source: ' + (m.trackLan || ''));
+    if (m.ocr) out.push('subtitle_note: 画面字幕识别，可能有错字');
+    out.push('verified: ' + (m.verified || 'single-sample'));
+    out.push('notes: transcript-only');
+    out.push('exported: ' + (m.exportedAt || new Date().toISOString()));
+    out.push('---');
+    out.push('');
+    out.push('# ' + (m.title || ''));
+    out.push('');
+    out.push('> 这份是**字幕全文**，没有经过 AI 整理。每行是播放器里的一句话，点时间回到原句。');
+    out.push('> 在扩展设置里填一个 API Key 之后，同一份字幕会变成带逐字引文、能核对来源的结论。');
+    out.push('');
+    out.push('## 字幕全文（' + list.length + ' 句）');
+    out.push('');
+    if (!list.length) {
+      out.push('（这个视频没有可导出的字幕：可能未登录 B站、作者没开 AI 字幕，或字幕接口这次没返回。）');
+      out.push('');
+    }
+    list.forEach((s) => {
+      const text = String((s && s.content) || '').replace(/\s+/g, ' ').trim();
+      out.push('- [' + fmtTime(s && s.from) + '](' + jump(s && s.from) + ') ' + text);
+    });
+    out.push('');
+    return out.join('\n');
+  }
   function toPromptLines(block, sentences) {
     const byId = new Map(sentences.map((s) => [s.sid, s]));
     const lines = block.sids.map((sid) => {
@@ -303,5 +350,5 @@
     return Object.assign({}, block, { lines });
   }
 
-  root.BnSum = { CHUNK, chunkSentences, promptFor, validate, validatePoint, toPromptLines, readabilityPrompt, sectionPrompt, validateSection, normalize };
+  root.BnSum = { CHUNK, chunkSentences, promptFor, validate, validatePoint, toPromptLines, readabilityPrompt, sectionPrompt, validateSection, normalize, transcriptMarkdown, fmtTime };
 })(typeof window !== 'undefined' ? window : globalThis);
