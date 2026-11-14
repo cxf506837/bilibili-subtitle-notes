@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "B站可核对笔记",
-  "version": "1.0.0",
-  "description": "跟着播放头边看边写，每条结论能点回原句。",
+  "name": "B站字幕笔记",
+  "version": "1.0.1",
+  "description": "把 B站 视频的字幕变成可核对的笔记：先验证这份字幕属不属于这个视频，再整理成带原句和时间戳的要点。不填 API Key 也能导出字幕全文。",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -25,7 +25,7 @@
     "service_worker": "src/background.js"
   },
   "action": {
-    "default_title": "B站可核对笔记 · 点一下打开面板",
+    "default_title": "B站字幕笔记 · 点一下打开面板",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

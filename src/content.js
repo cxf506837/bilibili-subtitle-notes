@@ -1,4 +1,4 @@
-// B站可核对笔记 · 页面内浮层。依赖 gate.js / summarize.js 先注入。
+// B站字幕笔记 · 页面内浮层。依赖 gate.js / summarize.js 先注入。
 (function () {
   'use strict';
   if (window.__bnLoaded) return;
