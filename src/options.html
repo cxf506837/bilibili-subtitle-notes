@@ -42,6 +42,14 @@
 <label>走神提示</label>
 <label class="row"><input type="checkbox" id="awayEnabled" checked /> 切走标签页超过 90 秒、或暂停超过 2 分钟，回来时给一条「展开补课」提示（只记时间戳，不记你去了哪里）</label>
 
+<label for="theme">面板配色</label>
+<select id="theme">
+  <option value="auto">跟随 B站 页面深浅（默认）</option>
+  <option value="forest">林间 · 明亮（场景当画框）</option>
+  <option value="ink">墨绿 · 安静（像纸质笔记本）</option>
+</select>
+<div class="hint">只改右侧面板的配色和顶部场景高度，不影响已经记下的笔记。</div>
+
 <label>画面文字（PPT / 板书）</label>
 <label class="row"><input type="checkbox" id="visualEnabled" checked /> 自动截取稳定的画面并本地识别文字，作为理解辅助（识别在本机跑，不联网、不花钱；低分辨率视频会自动跳过）</label>
 

@@ -35,11 +35,26 @@
 
   const CSS = [
     ':host { all: initial; }',
+    ':host { --bnbg: #fff; --bnfg: #18191c; --bnmuted: #9499a0; --bnline: rgba(128,128,128,.2); --bnline2: rgba(128,128,128,.38); --bnfill: rgba(128,128,128,.10); --bnfill2: rgba(128,128,128,.24); --bnaccent: #00aeec; --bnaccentInk: #0091c5; --bnaccentSoft: rgba(0,174,236,.12); --bnquote: rgba(0,174,236,.5); --bnhero: 150px; }',
     '.wrap { position: fixed; top: 0; right: 0; width: 380px; height: 100vh; z-index: 2147483000;',
     '  display: flex; font: 13px/1.6 -apple-system, PingFang SC, Microsoft YaHei, sans-serif;',
-    '  color: #18191c; background: #fff; --bnbg: #fff; box-shadow: -2px 0 12px rgba(0,0,0,.12);',
+        '  color: var(--bnfg); background: var(--bnbg); box-shadow: -2px 0 12px rgba(0,0,0,.12);',,
     '  transition: width .15s ease; }',
-    '.wrap.dark { color: #e3e5e7; background: #1f2022; --bnbg: #1f2022; box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
+    '.wrap.dark { color: #e3e5e7; background: #1f2022; --bnbg: #1f2022; --bnfg: #e3e5e7; box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
+    // 两套配色：林间（明亮，场景当画框）/ 墨绿（安静，像纸质笔记本）。只换 token，不改布局。
+    '.wrap.theme-forest { --bnbg: #fbfcf9; --bnfg: #1e2620; --bnmuted: #7c8a7d;',
+    '  --bnline: rgba(58,92,66,.16); --bnline2: rgba(58,92,66,.30);',
+    '  --bnfill: rgba(58,92,66,.06); --bnfill2: rgba(58,92,66,.14);',
+    '  --bnaccent: #3f7d52; --bnaccentInk: #2f6841; --bnaccentSoft: rgba(63,125,82,.13); --bnquote: rgba(63,125,82,.45);',
+    '  --bnhero: 176px; background: var(--bnbg); }',
+    '.wrap.theme-ink { --bnbg: #121a15; --bnfg: #e2ebe4; --bnmuted: #7f8f85;',
+    '  --bnline: rgba(178,210,188,.14); --bnline2: rgba(178,210,188,.26);',
+    '  --bnfill: rgba(178,210,188,.06); --bnfill2: rgba(178,210,188,.14);',
+    '  --bnaccent: #7cc79a; --bnaccentInk: #9ad9b3; --bnaccentSoft: rgba(124,199,154,.14); --bnquote: rgba(124,199,154,.5);',
+    '  --bnhero: 132px; background: var(--bnbg); box-shadow: -2px 0 14px rgba(0,0,0,.45); }',
+    '.theme-forest .hero3d .heroFade { background: linear-gradient(180deg, rgba(0,0,0,0) 56%, rgba(251,252,249,.5) 86%, var(--bnbg) 100%); }',
+    '.theme-ink .hero3d .heroFade { background: linear-gradient(180deg, rgba(18,26,21,.04) 0%, rgba(18,26,21,.34) 56%, rgba(18,26,21,.86) 86%, var(--bnbg) 100%); }',
+    '.theme-ink .hero3d iframe { filter: saturate(.82) brightness(.92); }',
     '.wrap.collapsed { width: 52px !important; cursor: pointer; }',
     // 点工具栏图标唤出面板时闪一下，让人确认「是它开了」
     '.wrap.flash { animation: bnflash 1.1s ease-out; }',
@@ -48,21 +63,21 @@
     '.handle:hover { background: rgba(128,128,128,.3); }',
     '.body { flex: 1; min-width: 0; display: flex; flex-direction: column; }',
     '.bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px; font-size: 12px; }',
-    '.acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 0 10px 8px; border-bottom: 1px solid rgba(128,128,128,.2); }',
-    '.dot { width: 7px; height: 7px; border-radius: 50%; background: #9499a0; flex: 0 0 7px; }',
+    '.acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 0 10px 8px; border-bottom: 1px solid var(--bnline); }',
+    '.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bnmuted); flex: 0 0 7px; }',
     '.dot.ok { background: #2ecc71; } .dot.warn { background: #f0a020; } .dot.bad { background: #e74c3c; }',
     '.grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
     // 多 P 标记：只占一小格，标题里写「第 2 P · 分P 名字」，不跟状态文字抢位置
-    '.plabel { flex: 0 0 auto; font-size: 11px; line-height: 1; padding: 2px 5px; border-radius: 4px; background: rgba(128,128,128,.16); opacity: .9; }',
+    '.plabel { flex: 0 0 auto; font-size: 11px; line-height: 1; padding: 2px 5px; border-radius: 4px; background: var(--bnline); opacity: .9; }',
     '.plabel.hidden { display: none; }',
-    '.btn { cursor: pointer; border: 1px solid rgba(128,128,128,.38); background: rgba(128,128,128,.10); color: inherit;',
+    '.btn { cursor: pointer; border: 1px solid var(--bnline2); background: var(--bnfill); color: inherit;',
     '  font-size: 12px; line-height: 1; padding: 5px 9px; border-radius: 6px; flex: 0 0 auto; white-space: nowrap;',
     '  display: inline-flex; align-items: center; gap: 4px; transition: background .12s, border-color .12s, color .12s; }',
-    '.btn:hover { background: rgba(128,128,128,.24); border-color: rgba(128,128,128,.65); }',
+    '.btn:hover { background: var(--bnfill2); border-color: var(--bnline2); }',
     '.btn:active { transform: translateY(1px); }',
-    '.btn:focus-visible { outline: 2px solid #00aeec; outline-offset: 1px; }',
-    '.btn.accent { border-color: #00aeec; color: #0091c5; background: rgba(0,174,236,.12); font-weight: 600; }',
-    '.btn.accent:hover { background: rgba(0,174,236,.24); border-color: #00aeec; }',
+    '.btn:focus-visible { outline: 2px solid var(--bnaccent); outline-offset: 1px; }',
+    '.btn.accent { border-color: var(--bnaccent); color: var(--bnaccentInk); background: var(--bnaccentSoft); font-weight: 600; }',
+    '.btn.accent:hover { background: var(--bnaccentSoft); border-color: var(--bnaccent); }',
     '.wrap.dark .btn.accent { color: #4fd2ff; }',
     '.wrap.collapsed .bar { display: none !important; }',
     '.wrap.collapsed .acts { flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; height: 100%; padding: 10px 0 12px; border-bottom: 0; }',
@@ -71,31 +86,31 @@
     // 收起态：一整条显眼的蓝色贴边标签。之前的 44px 灰字在深色页面上几乎看不见（用户当面提过两次）
     '.foldonly { display: none; }',
     '.wrap.collapsed .foldonly { display: flex; align-items: center; justify-content: center; }',
-    '.wrap.collapsed .foldbrand { writing-mode: vertical-rl; letter-spacing: 3px; font-size: 13px; font-weight: 700; color: #0091c5; padding: 2px 0; }',
+    '.wrap.collapsed .foldbrand { writing-mode: vertical-rl; letter-spacing: 3px; font-size: 13px; font-weight: 700; color: var(--bnaccentInk); padding: 2px 0; }',
     '.wrap.dark .wrap.collapsed .foldbrand, .wrap.collapsed.dark .foldbrand { color: #4fd2ff; }',
     '.wrap.collapsed .foldcount { margin-top: auto; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px;',
-    '  background: #00aeec; color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }',
+    '  background: var(--bnaccent); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }',
     '.wrap.collapsed .foldcount.zero { background: rgba(128,128,128,.35); }',
     '.wrap.collapsed #btnFold { writing-mode: vertical-rl; letter-spacing: 2px; padding: 22px 8px; font-size: 13px;',
-    '  background: #00aeec; border-color: #00aeec; color: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,174,236,.45); }',
-    '.wrap.collapsed:hover #btnFold { background: #00c2ff; border-color: #00c2ff; }',
-    '.outline { padding: 8px 10px; border-bottom: 1px solid rgba(128,128,128,.2); max-height: 34vh; overflow: auto; }',
+    '  background: var(--bnaccent); border-color: var(--bnaccent); color: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.18); }',
+    '.wrap.collapsed:hover #btnFold { filter: brightness(1.06); }',
+    '.outline { padding: 8px 10px; border-bottom: 1px solid var(--bnline); max-height: 34vh; overflow: auto; }',
     '.outline.hidden { display: none; }',
     '.outline .item { cursor: pointer; padding: 2px 0; opacity: .8; display: flex; gap: 6px; }',
     '.outline .item:hover { opacity: 1; }',
-    '.outline .t { color: #9499a0; font-variant-numeric: tabular-nums; flex: 0 0 auto; }',
+    '.outline .t { color: var(--bnmuted); font-variant-numeric: tabular-nums; flex: 0 0 auto; }',
     '.stream { flex: 1; overflow-y: auto; padding: 4px 0 12px; }',
-    '.note { padding: 8px 10px; border-bottom: 1px dashed rgba(128,128,128,.18); }',
+    '.note { padding: 8px 10px; border-bottom: 1px dashed var(--bnline); }',
     '.note .h { display: flex; gap: 8px; align-items: baseline; }',
-    '.note .t { color: #00aeec; cursor: pointer; font-variant-numeric: tabular-nums; flex: 0 0 auto; }',
+    '.note .t { color: var(--bnaccent); cursor: pointer; font-variant-numeric: tabular-nums; flex: 0 0 auto; }',
     '.note .t:hover { text-decoration: underline; }',
     '.note .sum { font-weight: 600; }',
     '.pt { margin: 6px 0 0; }',
-    '.pt .q { border-left: 2px solid rgba(0,174,236,.5); padding-left: 8px; opacity: .75; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }',
+    '.pt .q { border-left: 2px solid var(--bnquote); padding-left: 8px; opacity: .75; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }',
     '.pt .p { margin-top: 2px; }',
     '.pt .kind { font-size: 11px; opacity: .55; margin-left: 4px; }',
-    '.ask { border-top: 1px solid rgba(128,128,128,.2); padding: 8px; display: flex; gap: 6px; }',
-    '.ask input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(128,128,128,.35);',
+    '.ask { border-top: 1px solid var(--bnline); padding: 8px; display: flex; gap: 6px; }',
+    '.ask input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--bnline2);',
     '  background: transparent; color: inherit; font-size: 13px; outline: none; }',
     '.empty { padding: 22px 14px; text-align: left; opacity: .78; font-size: 12px; line-height: 1.85; }',
     '.empty .et { display: block; font-size: 13px; font-weight: 600; opacity: .95; margin-bottom: 6px; }',
@@ -104,7 +119,7 @@
     '.streamwrap { position: relative; flex: 1; min-height: 0; display: flex; }',
     '.jump { position: absolute; right: 10px; bottom: 10px; z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,.18); }',
     '.jump.hidden { display: none; }',
-    '.gap { margin: 4px 10px; padding: 6px 8px; border: 1px dashed rgba(128,128,128,.45); border-radius: 6px; }',
+    '.gap { margin: 4px 10px; padding: 6px 8px; border: 1px dashed var(--bnline2); border-radius: 6px; }',
     '.gap .gt { font-size: 12px; opacity: .7; display: flex; align-items: center; gap: 6px; }',
     '.gap .gt .tt { font-variant-numeric: tabular-nums; }',
     '.gap .gb { display: flex; gap: 6px; margin-top: 6px; }',
@@ -113,8 +128,8 @@
     '.outline .item .b { opacity: 0; flex: 0 0 auto; }',
     '.outline .item.active { opacity: 1; font-weight: 600; }',
     '.outline .item.sec { opacity: 1; font-weight: 600; margin: 8px 0 2px; padding-top: 4px;',
-    '  border-top: 1px dashed rgba(128,128,128,.25); }',
-    '.outline .item.sec .s { color: #00aeec; }',
+    '  border-top: 1px dashed var(--bnline2); }',
+    '.outline .item.sec .s { color: var(--bnaccent); }',
     '.outline .item.sec:first-child { border-top: 0; margin-top: 0; }',
     '.outline .item.active .b { opacity: 1; }',
     // 走神横幅 / 小挂件 / 补课视图
@@ -127,7 +142,7 @@
     '.awaymini.hidden { display: none; }',
     '.catchup { padding: 8px 10px; }',
     '.catchup .ch { font-weight: 600; margin-bottom: 6px; }',
-    '.catchup .row { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed rgba(128,128,128,.18); }',
+    '.catchup .row { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--bnline); }',
     '.catchup .row .t { color: #00aeec; cursor: pointer; font-variant-numeric: tabular-nums; flex: 0 0 auto; }',
     '.catchup .row .s { flex: 1; min-width: 0; }',
     '.catchup .cf { margin-top: 10px; display: flex; gap: 6px; }',
@@ -153,14 +168,14 @@
   '.wrap.autohide .handle, .wrap.autohide .body { display: none !important; }',
   '.slim { display: none; }',
   '.wrap.autohide .slim { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%;',
-  '  height: 100%; padding: 12px 0; background: #00aeec; color: #fff; box-shadow: -2px 0 10px rgba(0,0,0,.18); }',
+  '  height: 100%; padding: 12px 0; background: var(--bnaccent); color: #fff; box-shadow: -2px 0 10px rgba(0,0,0,.18); }',
   '.wrap.autohide .slim .st { writing-mode: vertical-rl; letter-spacing: 2px; font-size: 11px; font-weight: 700; }',
   '.wrap.autohide .slim .sc { font-size: 10px; font-variant-numeric: tabular-nums; opacity: .92; }',
   '.wrap.autohide .slim .sk { font-size: 11px; opacity: .85; }',
   '.wrap.autohide.dark .slim { background: #0b7fa3; }',
   // 林间场景（面板顶部的 3D 森林，素材在 src/scene：Three.js r149 + 单文件场景）
   // 场景要 1600×900 才有树（380 宽原生渲染只剩雾），所以大画布渲染、CSS 缩放裁切，指针事件全关。
-  '.hero3d { position: relative; flex: 0 0 150px; height: 150px; overflow: hidden; background: #4a4d44; }',
+  '.hero3d { position: relative; flex: 0 0 var(--bnhero, 150px); height: var(--bnhero, 150px); overflow: hidden; background: #4a4d44; }',
   '.hero3d iframe { position: absolute; left: 0; top: -96px; width: 1600px; height: 900px; border: 0; margin: 0;',
   '  transform: scale(0.2375); transform-origin: 0 0; pointer-events: none; }',
   '.hero3d .heroFade { position: absolute; inset: 0; pointer-events: none;',
@@ -2441,13 +2456,27 @@
     shiftApply();
   });
 
+  // 主题：auto = 跟页面深浅；forest = 林间（明亮）；ink = 墨绿（安静，像纸质笔记本）
+  let themeMode = 'auto';
   function applyTheme() {
+    if (themeMode === 'forest' || themeMode === 'ink') {
+      wrap.classList.remove('dark');
+      wrap.classList.toggle('theme-forest', themeMode === 'forest');
+      wrap.classList.toggle('theme-ink', themeMode === 'ink');
+      return;
+    }
+    wrap.classList.remove('theme-forest', 'theme-ink');
     const bg = getComputedStyle(document.documentElement).backgroundColor;
     const m = bg.match(/\d+/g);
     const dark = m ? (Number(m[0]) + Number(m[1]) + Number(m[2])) / 3 < 120 : false;
     wrap.classList.toggle('dark', dark);
   }
   setInterval(applyTheme, 3000);
+  chrome.storage.local.get(['bn.theme'], function (r) {
+    const v = r && r['bn.theme'];
+    themeMode = (v === 'forest' || v === 'ink') ? v : 'auto';
+    applyTheme();
+  });
 
   // 先把默认宽度落到行内样式：只靠 CSS 默认值时，复制/粘贴或别的站点样式带偏就会撑满整页
   wrap.style.width = state.width + 'px';
@@ -2460,6 +2489,11 @@
   if (chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(function (ch) {
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
+      if (ch['bn.theme']) {
+        const v2 = ch['bn.theme'].newValue;
+        themeMode = (v2 === 'forest' || v2 === 'ink') ? v2 : 'auto';
+        applyTheme();
+      }
       if (ch['bn.visualEnabled']) {
         state.visual.enabled = ch['bn.visualEnabled'].newValue !== false;
         if (state.visual.enabled) startVisual();

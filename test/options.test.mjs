@@ -120,5 +120,17 @@ els.test.listeners.click();
 ok('空 key 时不发请求', sent === null);
 ok('空 key 时提示先填 key', els.msg.textContent.indexOf('API Key') >= 0, els.msg.textContent);
 
+// 7) 面板主题：默认 auto、已存值回显、保存时写进 storage
+fresh({});
+ok('主题默认 auto', els.theme.value === 'auto', els.theme.value);
+fresh({ saved: { 'bn.theme': 'ink' } });
+ok('已存主题回显 ink', els.theme.value === 'ink', els.theme.value);
+fresh({});
+els.theme.value = 'forest';
+els.apiBase.value = 'https://api.deepseek.com/v1';
+els.model.value = 'deepseek-chat';
+els.save.listeners.click();
+ok('保存时写入 bn.theme', !!(saved && saved['bn.theme'] === 'forest'), JSON.stringify(saved && saved['bn.theme']));
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

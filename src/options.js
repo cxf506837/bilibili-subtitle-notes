@@ -52,7 +52,7 @@ function presetIdFor(apiBase) {
 
 renderPresets();
 
-chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled'], (r) => {
+chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled', 'bn.theme'], (r) => {
   const apiBase = r.apiBase || 'https://api.deepseek.com/v1';
   $('apiBase').value = apiBase;
   $('model').value = r.model || 'deepseek-chat';
@@ -61,6 +61,7 @@ chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEna
   $('maxTokens').value = r.maxTokens || 700;
   $('awayEnabled').checked = r['bn.awayEnabled'] !== false;
   $('visualEnabled').checked = r['bn.visualEnabled'] !== false;
+  $('theme').value = (r['bn.theme'] === 'forest' || r['bn.theme'] === 'ink') ? r['bn.theme'] : 'auto';
 });
 
 $('save').addEventListener('click', () => {
@@ -73,7 +74,8 @@ $('save').addEventListener('click', () => {
   if (!allow.ok) return show(originError(allow), true);
   const awayEnabled = $('awayEnabled').checked;
   const visualEnabled = $('visualEnabled').checked;
-  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled }, () => {
+  const theme = $('theme').value || 'auto';
+  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled, 'bn.theme': theme }, () => {
     show('已保存。回到 B站 视频页刷新即可生效。');
   });
 });
