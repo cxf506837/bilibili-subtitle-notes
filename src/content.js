@@ -10,7 +10,7 @@
   const state = {
     bvid: '', p: 1, meta: null, sentences: [], blocks: [], notes: [],
     verdict: '', trackLan: '', status: 'init', detail: '' ,
-    tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, lastTime: 0,
+    tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, autoHidden: false, lastTime: 0,
     // 合集批量导出：running 防重入，cancel 让「停止导出」在下一 P 前生效
     batch: { running: false, cancel: false },
     covered: [], lastTick: null, emptyHint: '', follow: true, queueHold: false,
@@ -148,11 +148,26 @@
     '.note .hstag { font-size: 11px; opacity: .55; margin-left: 6px; font-weight: 400; }',
     '.vnote.bad { opacity: .95; color: #c0392b; }',
     '.wrap.dark .vnote.bad { color: #ff8a80; }',
+  // 自动收起态：22px 贴边细条，别压住 B站 右侧推荐区（用户反馈：面板一展开就点不到新视频）
+  '.wrap.autohide { width: 22px !important; cursor: pointer; }',
+  '.wrap.autohide .handle, .wrap.autohide .body { display: none !important; }',
+  '.slim { display: none; }',
+  '.wrap.autohide .slim { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%;',
+  '  height: 100%; padding: 12px 0; background: #00aeec; color: #fff; box-shadow: -2px 0 10px rgba(0,0,0,.18); }',
+  '.wrap.autohide .slim .st { writing-mode: vertical-rl; letter-spacing: 2px; font-size: 11px; font-weight: 700; }',
+  '.wrap.autohide .slim .sc { font-size: 10px; font-variant-numeric: tabular-nums; opacity: .92; }',
+  '.wrap.autohide .slim .sk { font-size: 11px; opacity: .85; }',
+  '.wrap.autohide.dark .slim { background: #0b7fa3; }',
   ].join('');
 
   const HTML = [
     '<div class="wrap" id="wrap">',
     '<div class="handle" id="handle"></div>',
+    '<div class="slim" id="slim" title="鼠标移上来展开笔记面板">',
+    '<span class="st">笔记</span>',
+    '<span class="sc" id="slimCount">0</span>',
+    '<span class="sk">‹</span>',
+    '</div>',
     '<div class="body">',
     '<div class="bar">',
     '<span class="dot" id="dot"></span>',
@@ -2184,7 +2199,8 @@
   let shiftPending = 0;
 
   function shiftNeeded() {
-    return state.collapsed ? 0 : state.width + 6; // +6 是面板左侧那条拖拽把手
+    if (state.collapsed || state.autoHidden) return 0; // 自动收起时整条让出去，页面恢复原宽
+    return state.width + 6; // +6 是面板左侧那条拖拽把手
   }
 
   function shiftFind() {
@@ -2252,6 +2268,7 @@
     if (e) e.stopPropagation();
     state.collapsed = !state.collapsed;
     wrap.classList.toggle('collapsed', state.collapsed);
+    if (state.collapsed) { state.autoHidden = false; wrap.classList.remove('autohide'); }
     syncFold();
     shiftBlockedAt = 0;
     setTimeout(shiftApply, 160); // 等面板宽度过渡结束再收放页面
@@ -2264,6 +2281,8 @@
       b.textContent = state.collapsed ? '展开 ▸' : '收起 ▸';
       b.title = state.collapsed ? '展开右侧笔记面板' : '收起右侧笔记面板';
     }
+    const sc = $('slimCount');
+    if (sc) sc.textContent = String(state.notes.length);
     const c = $('foldCount');
     if (c) {
       const n = state.notes.length;
@@ -2276,6 +2295,59 @@
   $('btnFold').addEventListener('click', foldToggle);
   $('foldBrand').addEventListener('click', foldToggle);
   $('foldCount').addEventListener('click', foldToggle);
+
+  // ---- 鼠标移出面板就缩成贴边细条 ----
+  // 用户反馈：面板一展开（或往左拉宽）就盖住 B站 右侧推荐区，点不到下一个视频。
+  // 策略：鼠标在面板里时正常展开；移开 0.6 秒后缩成 22px 细条，同时把页面宽度还回去。
+  let hideTimer = 0;
+  let pointerInside = false;
+  const HIDE_DELAY = 600;
+
+  function autoHideAllowed() {
+    if (state.collapsed) return false; // 手动收起态有自己的交互，不掺和
+    if (dragging) return false;        // 正在拖宽度
+    if (pointerInside) return false;   // 鼠标还在面板上
+    const ae = shadow.activeElement;
+    if (ae && ae.id === 'askInput') return false; // 正在打字，收了会把没发出去的字弄丢
+    return true;
+  }
+
+  function autoHideNow() {
+    if (state.autoHidden || !autoHideAllowed()) return;
+    state.autoHidden = true;
+    wrap.classList.add('autohide');
+    syncFold();
+    shiftBlockedAt = 0;
+    shiftApply();
+  }
+
+  function autoShow() {
+    if (!state.autoHidden) return;
+    state.autoHidden = false;
+    wrap.classList.remove('autohide');
+    shiftBlockedAt = 0;
+    shiftApply();
+  }
+
+  wrap.addEventListener('mouseenter', function () {
+    pointerInside = true;
+    clearTimeout(hideTimer);
+    autoShow();
+  });
+  wrap.addEventListener('mouseleave', function () {
+    pointerInside = false;
+    clearTimeout(hideTimer);
+    if (!autoHideAllowed()) return;
+    hideTimer = setTimeout(autoHideNow, HIDE_DELAY);
+  });
+  // 打完字把输入框失焦（点了别处）时也要收，不然面板会一直挂着
+  $('askInput').addEventListener('blur', function () {
+    clearTimeout(hideTimer);
+    if (pointerInside) return;
+    hideTimer = setTimeout(autoHideNow, HIDE_DELAY);
+  });
+  $('slim').addEventListener('click', function (e) { e.stopPropagation(); autoShow(); });
+  window.__bnAutoHide = { hide: autoHideNow, show: autoShow, state: function () { return { hidden: state.autoHidden, collapsed: state.collapsed }; } };
   $('awayOpen').addEventListener('click', function () { openCatchup(state.away.bannerSpan || state.away.last); });
   $('awayIgnore').addEventListener('click', hideAway);
   $('awayX').addEventListener('click', hideAway);
@@ -2396,6 +2468,12 @@
       syncFold();
       shiftBlockedAt = 0;
       setTimeout(shiftApply, 160);
+    }
+    if (state.autoHidden) {
+      state.autoHidden = false;
+      wrap.classList.remove('autohide');
+      shiftBlockedAt = 0;
+      shiftApply();
     }
     wrap.classList.remove('flash');
     void wrap.offsetWidth; // 强制重排，连点两次也能重新播放动画
