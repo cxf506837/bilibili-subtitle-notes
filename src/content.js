@@ -37,9 +37,9 @@
     ':host { all: initial; }',
     '.wrap { position: fixed; top: 0; right: 0; width: 380px; height: 100vh; z-index: 2147483000;',
     '  display: flex; font: 13px/1.6 -apple-system, PingFang SC, Microsoft YaHei, sans-serif;',
-    '  color: #18191c; background: #fff; box-shadow: -2px 0 12px rgba(0,0,0,.12);',
+    '  color: #18191c; background: #fff; --bnbg: #fff; box-shadow: -2px 0 12px rgba(0,0,0,.12);',
     '  transition: width .15s ease; }',
-    '.wrap.dark { color: #e3e5e7; background: #1f2022; box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
+    '.wrap.dark { color: #e3e5e7; background: #1f2022; --bnbg: #1f2022; box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
     '.wrap.collapsed { width: 52px !important; cursor: pointer; }',
     // 点工具栏图标唤出面板时闪一下，让人确认「是它开了」
     '.wrap.flash { animation: bnflash 1.1s ease-out; }',
@@ -158,6 +158,15 @@
   '.wrap.autohide .slim .sc { font-size: 10px; font-variant-numeric: tabular-nums; opacity: .92; }',
   '.wrap.autohide .slim .sk { font-size: 11px; opacity: .85; }',
   '.wrap.autohide.dark .slim { background: #0b7fa3; }',
+  // 林间场景（面板顶部的 3D 森林，素材在 src/scene：Three.js r149 + 单文件场景）
+  // 场景要 1600×900 才有树（380 宽原生渲染只剩雾），所以大画布渲染、CSS 缩放裁切，指针事件全关。
+  '.hero3d { position: relative; flex: 0 0 150px; height: 150px; overflow: hidden; background: #4a4d44; }',
+  '.hero3d iframe { position: absolute; left: 0; top: -96px; width: 1600px; height: 900px; border: 0; margin: 0;',
+  '  transform: scale(0.2375); transform-origin: 0 0; pointer-events: none; }',
+  '.hero3d .heroFade { position: absolute; inset: 0; pointer-events: none;',
+  '  background: linear-gradient(180deg, rgba(0,0,0,0) 34%, rgba(0,0,0,.06) 66%, var(--bnbg) 100%); }',
+  '.wrap.collapsed .hero3d, .wrap.autohide .hero3d { display: none !important; }',
+  '.hero3d.paused iframe { visibility: hidden; }',
   ].join('');
 
   const HTML = [
@@ -169,6 +178,10 @@
     '<span class="sk">‹</span>',
     '</div>',
     '<div class="body">',
+    '<div class="hero3d" id="hero3d">',
+    '<iframe id="sceneFrame" title="林间场景" aria-hidden="true" scrolling="no" tabindex="-1"></iframe>',
+    '<div class="heroFade"></div>',
+    '</div>',
     '<div class="bar">',
     '<span class="dot" id="dot"></span>',
     '<span class="plabel hidden" id="pLabel"></span>',
@@ -2274,6 +2287,7 @@
     wrap.classList.toggle('collapsed', state.collapsed);
     if (state.collapsed) { state.autoHidden = false; wrap.classList.remove('autohide'); }
     syncFold();
+    syncScene();
     shiftBlockedAt = 0;
     setTimeout(shiftApply, 160); // 等面板宽度过渡结束再收放页面
   }
@@ -2321,6 +2335,7 @@
     state.autoHidden = true;
     wrap.classList.add('autohide');
     syncFold();
+    syncScene();
     shiftBlockedAt = 0;
     shiftApply();
   }
@@ -2329,6 +2344,7 @@
     if (!state.autoHidden) return;
     state.autoHidden = false;
     wrap.classList.remove('autohide');
+    syncScene();
     shiftBlockedAt = 0;
     shiftApply();
   }
@@ -2337,9 +2353,11 @@
     pointerInside = true;
     clearTimeout(hideTimer);
     autoShow();
+    syncScene();
   });
   wrap.addEventListener('mouseleave', function () {
     pointerInside = false;
+    syncScene();
     clearTimeout(hideTimer);
     if (!autoHideAllowed()) return;
     hideTimer = setTimeout(autoHideNow, HIDE_DELAY);
@@ -2352,6 +2370,35 @@
   });
   $('slim').addEventListener('click', function (e) { e.stopPropagation(); autoShow(); });
   window.__bnAutoHide = { hide: autoHideNow, show: autoShow, state: function () { return { hidden: state.autoHidden, collapsed: state.collapsed }; } };
+
+  // ---- 顶部林间场景（src/scene，Three.js 本地渲染）----
+  // 只在「面板真的显示着」时渲染：手动收起 / 自动隐藏 / 切到别的标签页 都停，省电省 CPU。
+  // iframe 只在第一次需要时创建 src，之后靠 CSS 隐藏，避免反复重建 WebGL 上下文。
+  const hero3d = $('hero3d');
+  const sceneFrame = $('sceneFrame');
+  let sceneMounted = false;
+  let sceneBornAt = 0;   // 进场动画只跑前 6 秒，之后鼠标不在面板上就冻住，省 CPU
+  function sceneShouldRun() {
+    if (state.collapsed || state.autoHidden) return false;
+    if (document.visibilityState === 'hidden') return false;
+    return true;
+  }
+  function syncScene() {
+    const want = sceneShouldRun();
+    if (want && !sceneMounted) {
+      sceneFrame.src = chrome.runtime.getURL('src/scene/index.html') + '?embed=1';
+      sceneMounted = true;
+      sceneBornAt = Date.now();
+    }
+    if (hero3d) hero3d.classList.toggle('paused', !want);
+    // 「活着」只在看的时候：鼠标在面板上，或刚打开的前 6 秒（进场动画）。
+    // 别的时候把 rAF 停掉——1600×900 的 WebGL 一直跑会吃掉一个核。
+    const live = want && (pointerInside || Date.now() - sceneBornAt < 6000);
+    try { if (sceneFrame.contentWindow) sceneFrame.contentWindow.postMessage(live ? 'bn-scene-play' : 'bn-scene-pause', '*'); } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', syncScene);
+  syncScene();
+  window.__bnScene = { on: function () { return sceneMounted && !hero3d.classList.contains('paused'); } };
   $('awayOpen').addEventListener('click', function () { openCatchup(state.away.bannerSpan || state.away.last); });
   $('awayIgnore').addEventListener('click', hideAway);
   $('awayX').addEventListener('click', hideAway);
