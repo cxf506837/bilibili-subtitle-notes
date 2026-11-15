@@ -16,6 +16,7 @@ const FILES = [
   'batch.test.mjs',      // 合集/多 P 批量导出
   'diag.test.mjs',      // 一键复制的诊断信息
   'chat.test.mjs',      // 后台请求体 / 400 错误映射（提问走 json:false）
+  'searchindex.test.mjs', // 跨视频笔记检索（索引压缩 / 关键词匹配 / 跳回）
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

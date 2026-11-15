@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>B站字幕笔记 · 搜索</title>
+<link rel="stylesheet" href="search.css" />
+</head>
+<body>
+<header class="hd">
+  <div class="brand">B站字幕笔记</div>
+  <div class="sub" id="scope">在你的 B站 笔记里搜</div>
+</header>
+<div class="box">
+  <input id="q" type="search" placeholder="搜关键词 / 公式 / 人名，空格分隔多个词" autocomplete="off" />
+</div>
+<div class="meta" id="meta"></div>
+<div class="list" id="list"></div>
+<footer class="ft">
+  <button class="btn primary" id="openPanel">打开当前视频的面板</button>
+  <button class="btn" id="opt">设置</button>
+</footer>
+<script src="searchindex.js"></script>
+<script src="search.js"></script>
+</body>
+</html>

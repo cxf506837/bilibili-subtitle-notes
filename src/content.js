@@ -1003,6 +1003,28 @@
       verdict: state.verdict, notes: state.notes, tokens: state.tokens,
       sections: state.sections, savedAt: Date.now(),
     });
+    syncSearchIndex();
+  }
+
+  // 跨视频检索：弹窗是扩展页面，读不到 bilibili.com 的 IndexedDB，
+  // 所以每次笔记变化都往 chrome.storage.local 写一份压扁的索引（bnidx:<bvid>:<cid>）。
+  // 攒 1.5 秒再写，别每出一块就序列化一次。
+  let idxTimer = 0;
+  function syncSearchIndex() {
+    if (!state.bvid || !state.notes.length) return;
+    if (!window.BnIndex) return;
+    clearTimeout(idxTimer);
+    idxTimer = setTimeout(function () {
+      try {
+        const m = state.meta || {};
+        const entry = window.BnIndex.build(state.bvid, {
+          title: m.title, cid: m.cid, page: m.page, pages: m.pages, part: m.part, updated: Date.now(),
+        }, state.notes);
+        const patch = {};
+        patch[window.BnIndex.PREFIX + state.bvid + ':' + (Number(m.cid) || 0)] = entry;
+        chrome.storage.local.set(patch);
+      } catch (e) { /* 索引写失败不影响面板本身 */ }
+    }, 1500);
   }
   // 每出一块就整份写一次 IndexedDB（120 块 = 120 次全量序列化）没必要：攒 800ms 写一次，
   // 关页面/切后台时立刻补写，保证不丢。
@@ -1031,6 +1053,7 @@
       state.cost = state.tokens / 1e6 * 1.5;
       costEl.textContent = (state.tokens / 1000).toFixed(1) + 'k ≈ ¥' + state.cost.toFixed(3);
     }
+    syncSearchIndex(); // 老笔记（这个功能之前攒的）也补进检索索引
     return state.notes.length;
   }
 
