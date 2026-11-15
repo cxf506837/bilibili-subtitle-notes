@@ -42,18 +42,26 @@
     '  transition: width .15s ease; }',
     '.wrap.dark { color: #e3e5e7; background: #1f2022; --bnbg: #1f2022; --bnfg: #e3e5e7; box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
     // 两套配色：林间（明亮，场景当画框）/ 墨绿（安静，像纸质笔记本）。只换 token，不改布局。
-    '.wrap.theme-forest { --bnbg: #fbfcf9; --bnfg: #1e2620; --bnmuted: #7c8a7d;',
+    '.wrap.theme-forest { --bnbg: #f1f4ec; --bnfg: #1b231c; --bnmuted: #77857a;',
     '  --bnline: rgba(58,92,66,.16); --bnline2: rgba(58,92,66,.30);',
     '  --bnfill: rgba(58,92,66,.06); --bnfill2: rgba(58,92,66,.14);',
     '  --bnaccent: #3f7d52; --bnaccentInk: #2f6841; --bnaccentSoft: rgba(63,125,82,.13); --bnquote: rgba(63,125,82,.45);',
-    '  --bnhero: 176px; background: var(--bnbg); }',
+    '  --bnhero: 150px; background: var(--bnbg); }',
     '.wrap.theme-ink { --bnbg: #121a15; --bnfg: #e2ebe4; --bnmuted: #7f8f85;',
     '  --bnline: rgba(178,210,188,.14); --bnline2: rgba(178,210,188,.26);',
     '  --bnfill: rgba(178,210,188,.06); --bnfill2: rgba(178,210,188,.14);',
     '  --bnaccent: #7cc79a; --bnaccentInk: #9ad9b3; --bnaccentSoft: rgba(124,199,154,.14); --bnquote: rgba(124,199,154,.5);',
     '  --bnhero: 132px; background: var(--bnbg); box-shadow: -2px 0 14px rgba(0,0,0,.45); }',
-    '.theme-forest .hero3d .heroFade { background: linear-gradient(180deg, rgba(0,0,0,0) 56%, rgba(251,252,249,.5) 86%, var(--bnbg) 100%); }',
-    '.theme-ink .hero3d .heroFade { background: linear-gradient(180deg, rgba(18,26,21,.04) 0%, rgba(18,26,21,.34) 56%, rgba(18,26,21,.86) 86%, var(--bnbg) 100%); }',
+    '.theme-forest .hero3d { box-shadow: inset 0 -1px 0 rgba(58,92,66,.06); }',
+    '.theme-ink .hero3d iframe { -webkit-mask-image: linear-gradient(180deg, #000 36%, rgba(0,0,0,.5) 68%, rgba(0,0,0,0) 100%); mask-image: linear-gradient(180deg, #000 36%, rgba(0,0,0,.5) 68%, rgba(0,0,0,0) 100%); }',
+    // 素纸：不要 3D 场景，只留一条极淡的绿色渐变做抬头，最不容易和 B站 页面打架
+    '.wrap.theme-paper { --bnbg: #f7f8f3; --bnfg: #1c231d; --bnmuted: #7d8a7f;',
+    '  --bnline: rgba(58,92,66,.14); --bnline2: rgba(58,92,66,.28);',
+    '  --bnfill: rgba(58,92,66,.05); --bnfill2: rgba(58,92,66,.12);',
+    '  --bnaccent: #3f7d52; --bnaccentInk: #2f6841; --bnaccentSoft: rgba(63,125,82,.12); --bnquote: rgba(63,125,82,.42);',
+    '  background: var(--bnbg); }',
+    '.theme-paper .hero3d { display: none !important; }',
+    '.theme-paper .bar { background: linear-gradient(180deg, #e7ecdf 0%, rgba(231,236,223,0) 100%); padding-top: 14px; }',
     '.theme-ink .hero3d iframe { filter: saturate(.82) brightness(.92); }',
     '.wrap.collapsed { width: 52px !important; cursor: pointer; }',
     // 点工具栏图标唤出面板时闪一下，让人确认「是它开了」
@@ -177,8 +185,10 @@
   // 场景要 1600×900 才有树（380 宽原生渲染只剩雾），所以大画布渲染、CSS 缩放裁切，指针事件全关。
   '.hero3d { position: relative; flex: 0 0 var(--bnhero, 150px); height: var(--bnhero, 150px); overflow: hidden; background: #4a4d44; }',
   '.hero3d iframe { position: absolute; left: 0; top: -96px; width: 1600px; height: 900px; border: 0; margin: 0;',
-  '  transform: scale(0.2375); transform-origin: 0 0; pointer-events: none; }',
-  '.hero3d .heroFade { position: absolute; inset: 0; pointer-events: none;',
+  '  transform: scale(0.2375); transform-origin: 0 0; pointer-events: none;',
+  '  -webkit-mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.55) 74%, rgba(0,0,0,0) 100%);',
+  '  mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.55) 74%, rgba(0,0,0,0) 100%); }',
+  '.hero3d .heroFade { position: absolute; inset: 0; pointer-events: none; display: none;',
   '  background: linear-gradient(180deg, rgba(0,0,0,0) 34%, rgba(0,0,0,.06) 66%, var(--bnbg) 100%); }',
   '.wrap.collapsed .hero3d, .wrap.autohide .hero3d { display: none !important; }',
   '.hero3d.paused iframe { visibility: hidden; }',
@@ -2459,13 +2469,14 @@
   // 主题：auto = 跟页面深浅；forest = 林间（明亮）；ink = 墨绿（安静，像纸质笔记本）
   let themeMode = 'auto';
   function applyTheme() {
-    if (themeMode === 'forest' || themeMode === 'ink') {
+    if (themeMode === 'forest' || themeMode === 'ink' || themeMode === 'paper') {
       wrap.classList.remove('dark');
       wrap.classList.toggle('theme-forest', themeMode === 'forest');
       wrap.classList.toggle('theme-ink', themeMode === 'ink');
+      wrap.classList.toggle('theme-paper', themeMode === 'paper');
       return;
     }
-    wrap.classList.remove('theme-forest', 'theme-ink');
+    wrap.classList.remove('theme-forest', 'theme-ink', 'theme-paper');
     const bg = getComputedStyle(document.documentElement).backgroundColor;
     const m = bg.match(/\d+/g);
     const dark = m ? (Number(m[0]) + Number(m[1]) + Number(m[2])) / 3 < 120 : false;
@@ -2474,7 +2485,7 @@
   setInterval(applyTheme, 3000);
   chrome.storage.local.get(['bn.theme'], function (r) {
     const v = r && r['bn.theme'];
-    themeMode = (v === 'forest' || v === 'ink') ? v : 'auto';
+    themeMode = (v === 'forest' || v === 'ink' || v === 'paper') ? v : 'auto';
     applyTheme();
   });
 
@@ -2491,7 +2502,7 @@
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
       if (ch['bn.theme']) {
         const v2 = ch['bn.theme'].newValue;
-        themeMode = (v2 === 'forest' || v2 === 'ink') ? v2 : 'auto';
+        themeMode = (v2 === 'forest' || v2 === 'ink' || v2 === 'paper') ? v2 : 'auto';
         applyTheme();
       }
       if (ch['bn.visualEnabled']) {

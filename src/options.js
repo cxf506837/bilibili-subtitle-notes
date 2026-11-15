@@ -61,7 +61,7 @@ chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEna
   $('maxTokens').value = r.maxTokens || 700;
   $('awayEnabled').checked = r['bn.awayEnabled'] !== false;
   $('visualEnabled').checked = r['bn.visualEnabled'] !== false;
-  $('theme').value = (r['bn.theme'] === 'forest' || r['bn.theme'] === 'ink') ? r['bn.theme'] : 'auto';
+  $('theme').value = (r['bn.theme'] === 'forest' || r['bn.theme'] === 'ink' || r['bn.theme'] === 'paper') ? r['bn.theme'] : 'auto';
 });
 
 $('save').addEventListener('click', () => {
