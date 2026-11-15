@@ -150,6 +150,27 @@
 
   // 多 P：wantP 是 URL 里的 ?p=N（从 1 开始）。B站 的 view 接口一次给全部分 P，
   // 但 d.cid 永远是默认 P（通常是 P1）——只按 d.cid 取，切到 P2 会拿到 P1 的字幕和时长。
+  // 合集（ugc_season）：一个视频可能属于一个多集课程。课时长在 arc.duration。
+  function parseSeason(d) {
+    const s = d && d.ugc_season;
+    if (!s || !Array.isArray(s.sections)) return null;
+    const eps = [];
+    s.sections.forEach((sec) => {
+      (sec.episodes || []).forEach((e) => {
+        if (!e || !e.bvid) return;
+        eps.push({
+          bvid: String(e.bvid),
+          cid: String(e.cid || ''),
+          page: Number(e.page) || 1,
+          title: String(e.title || (e.arc && e.arc.title) || ''),
+          duration: Number(e.arc && e.arc.duration) || 0,
+        });
+      });
+    });
+    if (!eps.length) return null;
+    return { id: String(s.id || ''), title: String(s.title || ''), eps: eps };
+  }
+
   async function resolveVideo(bvid, wantP) {
     const j = await getJson('https://api.bilibili.com/x/web-interface/view?bvid=' + encodeURIComponent(bvid));
     if (!j || j.code !== 0 || !j.data) throw new Error('view api failed: ' + (j && j.code));
@@ -175,6 +196,7 @@
       page: page.page || 1,
       part: page.part || '',
       tname: d.tname || '',
+      season: parseSeason(d),
     };
   }
 

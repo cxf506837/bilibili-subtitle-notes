@@ -926,3 +926,13 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 验证（真机）：索引 count=119；输入「铁傀儡」找到 21 条；首条 `data-url` 带 `?t=0`，点击后确实落到 `?t=0`。截图 `docs/search.png`。
 
 坑：弹窗当普通标签页打开时，`<span class="sum">` 是 inline，`text-overflow: ellipsis` 对 inline 无效，长摘要会把列表撑出横向滚动条 —— 必须 `display:block`。分组标题同理（`<span class="gtt">` + 省略号）。
+
+## 2026-11-16 课程目录（合集 / 多 P）
+
+用户要学的是长系列：40 小时拆成不到 1 小时的集。所以面板的第一件事改成「你现在在哪个课程的第几集」，而不是只写单个视频。
+
+- `src/course.js` 是纯函数：`build(meta)` 把 `ugc_season` / `pages` / 单视频都归一成 `{kind, id, title, episodes[], total}`；`episodeUrl()` 拼 `?p=N&t=秒`；`isWatched()` 判 `>= max(30, 0.9*时长)`；`nextUnwatched()` 是「继续」按钮的依据。
+- `src/gate.js` 的 `resolveVideo()` 新增 `parseSeason(d)`，把 `sections[].episodes[]` 拍平成 `season.eps`（时长取 `arc.duration`），别的字段一律不动。
+- 进度存在 `chrome.storage.local` 的 `bnp:<cid>`，`timeupdate` 每 5 秒最多写一次。没放 IndexedDB：换页面/换 P 时内容脚本可能还没开库就要读。
+- UI 是两行表头（课程名 / 集数·总时长·已看几集 + 「继续」），点开是集清单；点一集如果就是这个视频就 seek，否则 `location.href` 跳走。
+- 测试：`test/course.test.mjs` 42 条（合集/多 P/单集、URL 拼参、时长格式、进度阈值、继续上次的回绕），全量 433 条。

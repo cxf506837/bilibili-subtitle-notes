@@ -55,6 +55,7 @@
         "src/hardsub.js",
         "src/frames.js",
         "src/searchindex.js",
+        "src/course.js",
         "src/content.js"
       ],
       "run_at": "document_idle"

@@ -162,6 +162,30 @@
   '.wrap.autohide .slim .sc { font-size: 10px; font-variant-numeric: tabular-nums; opacity: .92; }',
   '.wrap.autohide .slim .sk { font-size: 11px; opacity: .85; }',
   '.wrap.autohide.dark .slim { background: #0b7fa3; }',
+  // 课程条：合集 / 多 P 视频显示「课程 → 集」，点一集直接跳过去
+  '.course { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; overflow: hidden; background: var(--bnfill); }',
+  '.course.hidden { display: none; }',
+  '.chd { padding: 6px 8px; cursor: pointer; }',
+  '.chd .c1 { display: flex; align-items: center; gap: 6px; }',
+  '.chd .c2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; }',
+  '.chd:hover { background: var(--bnfill2); }',
+  '.chd .ct { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+  '.chd .cm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
+  '.chd .cm { font-size: 11px; color: var(--bnmuted); font-variant-numeric: tabular-nums; }',
+  '.chd .next { flex: 0 0 auto; }',
+  '.chd .cx { flex: 0 0 auto; font-size: 11px; color: var(--bnmuted); }',
+  '.chd .cx.open { transform: rotate(180deg); }',
+  '.clist { display: none; max-height: 210px; overflow-y: auto; border-top: 1px solid var(--bnline); }',
+  '.clist.open { display: block; }',
+  '.crow { display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 5px 8px; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }',
+  '.crow:hover { background: var(--bnfill2); }',
+  '.crow .ci { flex: 0 0 22px; font-size: 11px; color: var(--bnmuted); font-variant-numeric: tabular-nums; }',
+  '.crow .cet { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+  '.crow .cd { flex: 0 0 auto; font-size: 11px; color: var(--bnmuted); font-variant-numeric: tabular-nums; }',
+  '.crow.done .cet { color: var(--bnmuted); }',
+  '.crow.done .ci { color: #00a56b; }',
+  '.crow.cur { background: var(--bnaccentSoft); }',
+  '.crow.cur .cet { font-weight: 600; }',
   ].join('');
 
   const HTML = [
@@ -191,6 +215,19 @@
     '<div class="foldonly foldcount zero" id="foldCount" title="已生成的笔记条数">0</div>',
     '</div>',
     '<div class="vnote hidden" id="rnote"></div>',
+    '<div class="course hidden" id="course">',
+    '<div class="chd" id="courseHead" title="这是合集 / 多 P：点开看清单，点一集直接跳过去">',
+    '<div class="c1">',
+    '<span class="ct" id="courseTitle"></span>',
+    '<span class="cx" id="courseToggle">▾</span>',
+    '</div>',
+    '<div class="c2">',
+    '<span class="cm" id="courseMeta"></span>',
+    '<button class="btn sm next hidden" id="courseNext" title="跳到下一集没看过的">继续</button>',
+    '</div>',
+    '</div>',
+    '<div class="clist" id="courseList"></div>',
+    '</div>',
     '<div class="away hidden" id="away">',
     '<span class="at" id="awayText"></span>',
     '<span class="ab">',
@@ -220,6 +257,153 @@
   const costEl = $('cost');
 
   const rnote = $('rnote');
+
+  // ---- 课程目录（合集 / 多 P）：课程 → 集，点一集直接跳过去 ----
+  const courseEl = $('course');
+  const courseHead = $('courseHead');
+  const courseTitleEl = $('courseTitle');
+  const courseMetaEl = $('courseMeta');
+  const courseNextEl = $('courseNext');
+  const courseToggleEl = $('courseToggle');
+  const courseListEl = $('courseList');
+  let courseModel = null;
+  let courseProgress = {};
+  let courseCur = -1;
+  let courseLastWatched = -1;
+  let progWroteAt = 0;
+
+  // 进度：一条一集，键 bnp:<cid> = 看到第几秒。放 chrome.storage.local，换视频 / 关页面都还在。
+  function loadCourseProgress() {
+    try {
+      chrome.storage.local.get(null, function (all) {
+        const map = {};
+        Object.keys(all || {}).forEach(function (k) {
+          if (k.indexOf('bnp:') === 0) map[k.slice(4)] = Number(all[k]) || 0;
+        });
+        courseProgress = map;
+        refreshCourse();
+      });
+    } catch (e) {}
+  }
+
+  function saveCourseProgress(t) {
+    const m = state.meta;
+    if (!m || !m.cid || !window.BnCourse) return;
+    const cid = String(m.cid);
+    const sec = Math.floor(t);
+    if (!(sec > 0)) return;
+    const prev = Number(courseProgress[cid]) || 0;
+    if (sec <= prev + 4) return;
+    if (Date.now() - progWroteAt < 5000) return;
+    progWroteAt = Date.now();
+    courseProgress[cid] = sec;
+    try {
+      const obj = {};
+      obj['bnp:' + cid] = sec;
+      chrome.storage.local.set(obj);
+    } catch (e) {}
+    // 正好跨过「这一集算看完」的门槛时，把课程条刷新一下
+    if (courseModel) {
+      const pr = window.BnCourse.progress(courseModel, courseProgress);
+      if (pr.watched !== courseLastWatched) refreshCourse();
+    }
+  }
+
+  function refreshCourse() {
+    try {
+      const meta = state.meta;
+      if (!window.BnCourse || !meta) {
+        courseEl.classList.add('hidden');
+        courseModel = null;
+        return;
+      }
+      const m = window.BnCourse.build(meta);
+      if (!m || m.kind === 'single') {
+        courseEl.classList.add('hidden');
+        courseModel = null;
+        return;
+      }
+      courseModel = m;
+      const pr = window.BnCourse.progress(m, courseProgress);
+      courseLastWatched = pr.watched;
+      courseCur = window.BnCourse.currentIndex(m, state.bvid, meta.cid);
+      courseEl.classList.remove('hidden');
+      courseTitleEl.textContent = m.title || (m.kind === 'season' ? '合集' : '本视频分 P');
+      courseTitleEl.title = m.title || '';
+      const bits = [];
+      bits.push((m.kind === 'season' ? '合集 ' : '分 P ') + m.episodes.length + (m.kind === 'season' ? ' 集' : ' 个'));
+      bits.push(window.BnCourse.fmtDur(m.total));
+      bits.push('已看 ' + pr.watched + ' 集');
+      courseMetaEl.textContent = bits.join(' · ');
+      renderCourseList();
+      const nx = window.BnCourse.nextUnwatched(m, courseProgress, courseCur);
+      courseNextEl.classList.toggle('hidden', !nx);
+      if (nx) courseNextEl.title = '跳到第 ' + nx.index + ' 集：' + nx.title;
+    } catch (e) {
+      courseEl.classList.add('hidden');
+    }
+  }
+
+  function renderCourseList() {
+    const m = courseModel;
+    if (!m) return;
+    const frag = document.createDocumentFragment();
+    m.episodes.forEach(function (ep, i) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'crow' + (i === courseCur ? ' cur' : '') + (window.BnCourse.isWatched(ep, courseProgress) ? ' done' : '');
+      row.dataset.i = String(i);
+      row.title = ep.title + (ep.url ? '' : '（没有跳转地址）');
+      const ci = document.createElement('span');
+      ci.className = 'ci';
+      ci.textContent = window.BnCourse.isWatched(ep, courseProgress) ? '✓' : String(ep.index);
+      const ct = document.createElement('span');
+      ct.className = 'cet';
+      ct.textContent = ep.title;
+      const cd = document.createElement('span');
+      cd.className = 'cd';
+      cd.textContent = window.BnCourse.fmtDur(ep.duration);
+      row.appendChild(ci);
+      row.appendChild(ct);
+      row.appendChild(cd);
+      frag.appendChild(row);
+    });
+    courseListEl.textContent = '';
+    courseListEl.appendChild(frag);
+  }
+
+  function openEpisode(i) {
+    const m = courseModel;
+    if (!m || !m.episodes[i]) return;
+    const ep = m.episodes[i];
+    const same = String(ep.bvid) === String(state.bvid) && state.meta && String(ep.cid) === String(state.meta.cid);
+    if (same) {
+      const v = getVideo();
+      if (v) { try { v.currentTime = Math.max(0, ep.sec || 0); v.play(); } catch (e) {} }
+      return;
+    }
+    if (ep.url) location.href = ep.url;
+  }
+
+  courseHead.addEventListener('click', function (ev) {
+    if (ev.target && ev.target.id === 'courseNext') return;
+    const open = !courseListEl.classList.contains('open');
+    courseListEl.classList.toggle('open', open);
+    courseToggleEl.classList.toggle('open', open);
+  });
+  courseListEl.addEventListener('click', function (ev) {
+    const row = ev.target && ev.target.closest ? ev.target.closest('.crow') : null;
+    if (!row) return;
+    openEpisode(Number(row.dataset.i));
+  });
+  courseNextEl.addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    if (!courseModel) return;
+    const nx = window.BnCourse.nextUnwatched(courseModel, courseProgress, courseCur);
+    if (!nx) return;
+    openEpisode(nx.index - 1);
+  });
+  loadCourseProgress();
 
   // 「这份字幕像机翻」必须写在界面上，不能只留在代码里。
   // 宁可说「仅供参考」，也不能让用户以为笔记不顺是因为模型笨。
@@ -1603,6 +1787,7 @@
 
   function onTimeUpdate() {
     const v = getVideo();
+    if (v) saveCourseProgress(v.currentTime);
     if (!v || !state.blocks.length) return;
     const t = v.currentTime;
     const prev = state.lastTick;
@@ -1804,6 +1989,7 @@
   }
   function restore(snap) {
     state.meta = snap.meta;
+    refreshCourse();
     state.sentences = snap.sentences;
     state.blocks = snap.blocks;
     state.notes = snap.notes;
@@ -1858,6 +2044,7 @@
     state.bvid = bvid;
     state.p = p;
     state.meta = null;
+    refreshCourse();
     setPageLabel();
     state.notes = [];
     state.blocks = [];
@@ -1890,6 +2077,7 @@
       // 播放器高亮的项才是真在播的那一 P：URL 没写 ?p= 的入口靠这里纠正
       state.meta = metaForCid(state.meta, cidFromDom());
       setPageLabel();
+      refreshCourse();
     } catch (e) {
       if (seq !== bootSeq) return;
       setStatus('bad', '取视频信息失败', String(e));
