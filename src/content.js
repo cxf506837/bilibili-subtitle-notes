@@ -35,34 +35,15 @@
 
   const CSS = [
     ':host { all: initial; }',
-    ':host { --bnbg: #fff; --bnfg: #18191c; --bnmuted: #9499a0; --bnline: rgba(128,128,128,.2); --bnline2: rgba(128,128,128,.38); --bnfill: rgba(128,128,128,.10); --bnfill2: rgba(128,128,128,.24); --bnaccent: #00aeec; --bnaccentInk: #0091c5; --bnaccentSoft: rgba(0,174,236,.12); --bnquote: rgba(0,174,236,.5); --bnhero: 150px; }',
+    // 配色直接取 B站 自己的一套：白底、#18191c 正文、#9499a0 次要、#e3e5e7 描边、#00aeec 强调
+    ':host { --bnbg: #ffffff; --bnfg: #18191c; --bnmuted: #9499a0; --bnline: #e3e5e7; --bnline2: #c9ccd0; --bnfill: #f1f2f3; --bnfill2: #e3e5e7; --bnaccent: #00aeec; --bnaccentInk: #0091c5; --bnaccentSoft: rgba(0,174,236,.10); --bnquote: rgba(0,174,236,.55); }',
     '.wrap { position: fixed; top: 0; right: 0; width: 380px; height: 100vh; z-index: 2147483000;',
     '  display: flex; font: 13px/1.6 -apple-system, PingFang SC, Microsoft YaHei, sans-serif;',
-        '  color: var(--bnfg); background: var(--bnbg); box-shadow: -2px 0 12px rgba(0,0,0,.12);',,
+    '  color: var(--bnfg); background: var(--bnbg); box-shadow: -2px 0 12px rgba(0,0,0,.12);',
     '  transition: width .15s ease; }',
-    '.wrap.dark { color: #e3e5e7; background: #1f2022; --bnbg: #1f2022; --bnfg: #e3e5e7; box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
-    // 两套配色：林间（明亮，场景当画框）/ 墨绿（安静，像纸质笔记本）。只换 token，不改布局。
-    '.wrap.theme-forest { --bnbg: #f1f4ec; --bnfg: #1b231c; --bnmuted: #77857a;',
-    '  --bnline: rgba(58,92,66,.16); --bnline2: rgba(58,92,66,.30);',
-    '  --bnfill: rgba(58,92,66,.06); --bnfill2: rgba(58,92,66,.14);',
-    '  --bnaccent: #3f7d52; --bnaccentInk: #2f6841; --bnaccentSoft: rgba(63,125,82,.13); --bnquote: rgba(63,125,82,.45);',
-    '  --bnhero: 150px; background: var(--bnbg); }',
-    '.wrap.theme-ink { --bnbg: #121a15; --bnfg: #e2ebe4; --bnmuted: #7f8f85;',
-    '  --bnline: rgba(178,210,188,.14); --bnline2: rgba(178,210,188,.26);',
-    '  --bnfill: rgba(178,210,188,.06); --bnfill2: rgba(178,210,188,.14);',
-    '  --bnaccent: #7cc79a; --bnaccentInk: #9ad9b3; --bnaccentSoft: rgba(124,199,154,.14); --bnquote: rgba(124,199,154,.5);',
-    '  --bnhero: 132px; background: var(--bnbg); box-shadow: -2px 0 14px rgba(0,0,0,.45); }',
-    '.theme-forest .hero3d { box-shadow: inset 0 -1px 0 rgba(58,92,66,.06); }',
-    '.theme-ink .hero3d iframe { -webkit-mask-image: linear-gradient(180deg, #000 36%, rgba(0,0,0,.5) 68%, rgba(0,0,0,0) 100%); mask-image: linear-gradient(180deg, #000 36%, rgba(0,0,0,.5) 68%, rgba(0,0,0,0) 100%); }',
-    // 素纸：不要 3D 场景，只留一条极淡的绿色渐变做抬头，最不容易和 B站 页面打架
-    '.wrap.theme-paper { --bnbg: #f7f8f3; --bnfg: #1c231d; --bnmuted: #7d8a7f;',
-    '  --bnline: rgba(58,92,66,.14); --bnline2: rgba(58,92,66,.28);',
-    '  --bnfill: rgba(58,92,66,.05); --bnfill2: rgba(58,92,66,.12);',
-    '  --bnaccent: #3f7d52; --bnaccentInk: #2f6841; --bnaccentSoft: rgba(63,125,82,.12); --bnquote: rgba(63,125,82,.42);',
-    '  background: var(--bnbg); }',
-    '.theme-paper .hero3d { display: none !important; }',
-    '.theme-paper .bar { background: linear-gradient(180deg, #e7ecdf 0%, rgba(231,236,223,0) 100%); padding-top: 14px; }',
-    '.theme-ink .hero3d iframe { filter: saturate(.82) brightness(.92); }',
+    '.wrap.dark { --bnbg: #1f2022; --bnfg: #e3e5e7; --bnmuted: #8a8f96; --bnline: #33363b; --bnline2: #45484d; --bnfill: #26282b; --bnfill2: #33363b; --bnaccent: #00aeec; --bnaccentInk: #55cdf3; --bnaccentSoft: rgba(0,174,236,.16); --bnquote: rgba(0,174,236,.55); box-shadow: -2px 0 12px rgba(0,0,0,.5); }',
+    '.wrap.dark .btn { background: #26282b; border-color: #33363b; color: #e3e5e7; }',
+    '.wrap.dark .btn:hover { background: #33363b; }',
     '.wrap.collapsed { width: 52px !important; cursor: pointer; }',
     // 点工具栏图标唤出面板时闪一下，让人确认「是它开了」
     '.wrap.flash { animation: bnflash 1.1s ease-out; }',
@@ -181,17 +162,6 @@
   '.wrap.autohide .slim .sc { font-size: 10px; font-variant-numeric: tabular-nums; opacity: .92; }',
   '.wrap.autohide .slim .sk { font-size: 11px; opacity: .85; }',
   '.wrap.autohide.dark .slim { background: #0b7fa3; }',
-  // 林间场景（面板顶部的 3D 森林，素材在 src/scene：Three.js r149 + 单文件场景）
-  // 场景要 1600×900 才有树（380 宽原生渲染只剩雾），所以大画布渲染、CSS 缩放裁切，指针事件全关。
-  '.hero3d { position: relative; flex: 0 0 var(--bnhero, 150px); height: var(--bnhero, 150px); overflow: hidden; background: #4a4d44; }',
-  '.hero3d iframe { position: absolute; left: 0; top: -96px; width: 1600px; height: 900px; border: 0; margin: 0;',
-  '  transform: scale(0.2375); transform-origin: 0 0; pointer-events: none;',
-  '  -webkit-mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.55) 74%, rgba(0,0,0,0) 100%);',
-  '  mask-image: linear-gradient(180deg, #000 46%, rgba(0,0,0,.55) 74%, rgba(0,0,0,0) 100%); }',
-  '.hero3d .heroFade { position: absolute; inset: 0; pointer-events: none; display: none;',
-  '  background: linear-gradient(180deg, rgba(0,0,0,0) 34%, rgba(0,0,0,.06) 66%, var(--bnbg) 100%); }',
-  '.wrap.collapsed .hero3d, .wrap.autohide .hero3d { display: none !important; }',
-  '.hero3d.paused iframe { visibility: hidden; }',
   ].join('');
 
   const HTML = [
@@ -203,10 +173,6 @@
     '<span class="sk">‹</span>',
     '</div>',
     '<div class="body">',
-    '<div class="hero3d" id="hero3d">',
-    '<iframe id="sceneFrame" title="林间场景" aria-hidden="true" scrolling="no" tabindex="-1"></iframe>',
-    '<div class="heroFade"></div>',
-    '</div>',
     '<div class="bar">',
     '<span class="dot" id="dot"></span>',
     '<span class="plabel hidden" id="pLabel"></span>',
@@ -2312,7 +2278,6 @@
     wrap.classList.toggle('collapsed', state.collapsed);
     if (state.collapsed) { state.autoHidden = false; wrap.classList.remove('autohide'); }
     syncFold();
-    syncScene();
     shiftBlockedAt = 0;
     setTimeout(shiftApply, 160); // 等面板宽度过渡结束再收放页面
   }
@@ -2360,7 +2325,6 @@
     state.autoHidden = true;
     wrap.classList.add('autohide');
     syncFold();
-    syncScene();
     shiftBlockedAt = 0;
     shiftApply();
   }
@@ -2369,7 +2333,6 @@
     if (!state.autoHidden) return;
     state.autoHidden = false;
     wrap.classList.remove('autohide');
-    syncScene();
     shiftBlockedAt = 0;
     shiftApply();
   }
@@ -2378,11 +2341,9 @@
     pointerInside = true;
     clearTimeout(hideTimer);
     autoShow();
-    syncScene();
   });
   wrap.addEventListener('mouseleave', function () {
     pointerInside = false;
-    syncScene();
     clearTimeout(hideTimer);
     if (!autoHideAllowed()) return;
     hideTimer = setTimeout(autoHideNow, HIDE_DELAY);
@@ -2396,34 +2357,6 @@
   $('slim').addEventListener('click', function (e) { e.stopPropagation(); autoShow(); });
   window.__bnAutoHide = { hide: autoHideNow, show: autoShow, state: function () { return { hidden: state.autoHidden, collapsed: state.collapsed }; } };
 
-  // ---- 顶部林间场景（src/scene，Three.js 本地渲染）----
-  // 只在「面板真的显示着」时渲染：手动收起 / 自动隐藏 / 切到别的标签页 都停，省电省 CPU。
-  // iframe 只在第一次需要时创建 src，之后靠 CSS 隐藏，避免反复重建 WebGL 上下文。
-  const hero3d = $('hero3d');
-  const sceneFrame = $('sceneFrame');
-  let sceneMounted = false;
-  let sceneBornAt = 0;   // 进场动画只跑前 6 秒，之后鼠标不在面板上就冻住，省 CPU
-  function sceneShouldRun() {
-    if (state.collapsed || state.autoHidden) return false;
-    if (document.visibilityState === 'hidden') return false;
-    return true;
-  }
-  function syncScene() {
-    const want = sceneShouldRun();
-    if (want && !sceneMounted) {
-      sceneFrame.src = chrome.runtime.getURL('src/scene/index.html') + '?embed=1';
-      sceneMounted = true;
-      sceneBornAt = Date.now();
-    }
-    if (hero3d) hero3d.classList.toggle('paused', !want);
-    // 「活着」只在看的时候：鼠标在面板上，或刚打开的前 6 秒（进场动画）。
-    // 别的时候把 rAF 停掉——1600×900 的 WebGL 一直跑会吃掉一个核。
-    const live = want && (pointerInside || Date.now() - sceneBornAt < 6000);
-    try { if (sceneFrame.contentWindow) sceneFrame.contentWindow.postMessage(live ? 'bn-scene-play' : 'bn-scene-pause', '*'); } catch (e) {}
-  }
-  document.addEventListener('visibilitychange', syncScene);
-  syncScene();
-  window.__bnScene = { on: function () { return sceneMounted && !hero3d.classList.contains('paused'); } };
   $('awayOpen').addEventListener('click', function () { openCatchup(state.away.bannerSpan || state.away.last); });
   $('awayIgnore').addEventListener('click', hideAway);
   $('awayX').addEventListener('click', hideAway);
@@ -2466,28 +2399,16 @@
     shiftApply();
   });
 
-  // 主题：auto = 跟页面深浅；forest = 林间（明亮）；ink = 墨绿（安静，像纸质笔记本）
-  let themeMode = 'auto';
+
+  // 面板配色不另立一套：白底 + B站 蓝，只在深色页面上自动反色（跟页面走，不做主题切换）
   function applyTheme() {
-    if (themeMode === 'forest' || themeMode === 'ink' || themeMode === 'paper') {
-      wrap.classList.remove('dark');
-      wrap.classList.toggle('theme-forest', themeMode === 'forest');
-      wrap.classList.toggle('theme-ink', themeMode === 'ink');
-      wrap.classList.toggle('theme-paper', themeMode === 'paper');
-      return;
-    }
-    wrap.classList.remove('theme-forest', 'theme-ink', 'theme-paper');
     const bg = getComputedStyle(document.documentElement).backgroundColor;
     const m = bg.match(/\d+/g);
     const dark = m ? (Number(m[0]) + Number(m[1]) + Number(m[2])) / 3 < 120 : false;
     wrap.classList.toggle('dark', dark);
   }
   setInterval(applyTheme, 3000);
-  chrome.storage.local.get(['bn.theme'], function (r) {
-    const v = r && r['bn.theme'];
-    themeMode = (v === 'forest' || v === 'ink' || v === 'paper') ? v : 'auto';
-    applyTheme();
-  });
+  applyTheme();
 
   // 先把默认宽度落到行内样式：只靠 CSS 默认值时，复制/粘贴或别的站点样式带偏就会撑满整页
   wrap.style.width = state.width + 'px';
@@ -2500,11 +2421,6 @@
   if (chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(function (ch) {
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
-      if (ch['bn.theme']) {
-        const v2 = ch['bn.theme'].newValue;
-        themeMode = (v2 === 'forest' || v2 === 'ink' || v2 === 'paper') ? v2 : 'auto';
-        applyTheme();
-      }
       if (ch['bn.visualEnabled']) {
         state.visual.enabled = ch['bn.visualEnabled'].newValue !== false;
         if (state.visual.enabled) startVisual();

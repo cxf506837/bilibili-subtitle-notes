@@ -58,19 +58,5 @@
       "run_at": "document_idle"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "src/scene/index.html",
-        "src/scene/three.min.js",
-        "src/scene/scene-boot.js",
-        "src/scene/scene-pill.js",
-        "src/scene/scene-forest.js"
-      ],
-      "matches": [
-        "https://www.bilibili.com/*"
-      ]
-    }
-  ],
   "options_page": "src/options.html"
 }
