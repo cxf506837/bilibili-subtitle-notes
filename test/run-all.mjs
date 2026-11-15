@@ -15,6 +15,7 @@ const FILES = [
   'transcript.test.mjs', // 无 Key 时的字幕全文导出
   'batch.test.mjs',      // 合集/多 P 批量导出
   'diag.test.mjs',      // 一键复制的诊断信息
+  'chat.test.mjs',      // 后台请求体 / 400 错误映射（提问走 json:false）
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

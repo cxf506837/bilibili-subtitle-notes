@@ -1353,9 +1353,13 @@
     }
   }
 
-  function callModel(messages) {
+  // opts.json === false：要自由文本（比如问答），别让后台加 response_format=json_object
+  // 加了会被 DeepSeek 以 400 拒掉（Prompt must contain the word 'json'），用户看到的就是「提问失败：HTTP 400」
+  function callModel(messages, opts) {
     return new Promise(function (resolve) {
-      chrome.runtime.sendMessage({ type: 'chat', messages: messages }, function (r) {
+      const msg = { type: 'chat', messages: messages };
+      if (opts && opts.json === false) msg.json = false;
+      chrome.runtime.sendMessage(msg, function (r) {
         if (chrome.runtime.lastError) return resolve({ ok: false, error: String(chrome.runtime.lastError.message) });
         resolve(r || { ok: false, error: 'no-response' });
       });
@@ -2185,7 +2189,7 @@
     const res = await callModel([
       { role: 'system', content: '你在根据视频笔记回答问题。只用给定笔记内容，不足就说没记到。答案末尾给一个 [mm:ss] 时间标记。' },
       { role: 'user', content: '笔记：\n' + ctx + '\n\n问题：' + q },
-    ]);
+    ], { json: false });
     box.textContent = res.ok ? (res.content || '') : ('提问失败：' + (res.error || ''));
     stream.scrollTop = stream.scrollHeight;
   }

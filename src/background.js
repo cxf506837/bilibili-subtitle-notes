@@ -77,7 +77,13 @@ async function chat(payload) {
   if (!res.ok) {
     let detail = '';
     try { detail = (await res.text()).slice(0, 300); } catch (e) {}
-    return { ok: false, code: 'http', status: res.status, error: 'HTTP ' + res.status, detail };
+    // 把服务商给的 reason 抠出来（例：Prompt must contain the word 'json'），别只甩一个 HTTP 400
+    let reason = '';
+    try {
+      const j = JSON.parse(detail);
+      reason = String((j && j.error && (j.error.message || j.error.code)) || (j && j.message) || '').slice(0, 160);
+    } catch (e) {}
+    return { ok: false, code: 'http', status: res.status, error: 'HTTP ' + res.status + (reason ? '：' + reason : ''), detail };
   }
   let j;
   try { j = await res.json(); } catch (e) { return { ok: false, code: 'bad-json', error: '返回不是 JSON' }; }
