@@ -27,7 +27,7 @@ const md = S.transcriptMarkdown(sents, {
   url: 'https://www.bilibili.com/video/BV1X?p=2',
   title: '测试标题（P2/5 · 下半场）',
   totalPages: 5, page: 2, part: '下半场',
-  trackLan: 'ai-zh', verified: 'two-samples-agree',
+  trackLan: 'ai-zh', verified: 'two-samples-agree', bvid: 'BV1X',
   jumpUrl: jump, exportedAt: '2026-11-14T00:00:00.000Z',
 });
 
@@ -37,6 +37,8 @@ ok('带了 source', md.indexOf('source: https://www.bilibili.com/video/BV1X?p=2'
 ok('多 P 时写 page / part', md.indexOf('page: 2/5') > 0 && md.indexOf('part: 下半场') > 0);
 ok('verified 原样透传', md.indexOf('verified: two-samples-agree') > 0);
 ok('导出的时间戳是传入的（可复现）', md.indexOf('exported: 2026-11-14T00:00:00.000Z') > 0);
+ok('带了 bvid（画库里按视频去重靠它）', md.indexOf('bvid: BV1X') > 0);
+ok('带 Obsidian 认的 tags', md.indexOf('tags:\n  - bilibili\n  - 视频笔记\n  - 字幕') > 0);
 ok('标题写成 h1', md.indexOf('# 测试标题（P2/5 · 下半场）') > 0);
 ok('明确说了没经 AI 整理', md.indexOf('没有经过 AI 整理') > 0);
 ok('句数标在标题里', md.indexOf('## 字幕全文（3 句）') > 0);
@@ -52,6 +54,7 @@ ok('OCR 来源带错字警告', ocrMd.indexOf('subtitle_note: 画面字幕识别
 const plainMd = S.transcriptMarkdown(sents, { title: 't', jumpUrl: jump });
 ok('普通字幕不带错字警告', plainMd.indexOf('subtitle_note') < 0);
 ok('没传 verified 时按单次取样写', plainMd.indexOf('verified: single-sample') > 0);
+ok('没传 bvid 时不写 bvid 行', plainMd.indexOf('\nbvid:') < 0);
 ok('单 P 不写 page/part', plainMd.indexOf('\npage:') < 0);
 
 // 空字幕：不能崩，也不能给一份空白文件

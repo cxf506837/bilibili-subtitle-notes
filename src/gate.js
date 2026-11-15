@@ -247,18 +247,22 @@
   // 其中一部分时长还对得上（比如歌词文件 cover 0.92）。只取第一个会直接把错的当真。
   // 投票依据：正确文件在同一批取样里出现的次数明显最多（实测 8 次里 5 次正确）。
   // onProgress({attempt, total, state}) 用来喂界面。
-  async function gateSubtitle(meta, onProgress) {
+  // opts: { attempts, earlyVotes } —— 批量导出（合集/多 P）用更少的取样次数：一屏几十 P，
+  // 每 P 都按页面上的 5 次取样会让用户以为卡死了。默认值保持不动，单视频仍走 5 次 / 3 票。
+  async function gateSubtitle(meta, onProgress, opts) {
+    const O = opts || {};
+    const maxAttempts = Math.max(1, Math.min(Number(O.attempts) || GATE.ATTEMPTS, 12));
     const attempts = [];
     const seen = new Map(); // hash -> { sentences, count, track, stats, first }
-    const EARLY_VOTES = 3;
+    const EARLY_VOTES = Math.max(2, Number(O.earlyVotes) || 3);
     let lastReason = 'no-attempt';
     let loginState; // undefined = 还没问过
     const startedAt = Date.now();
-    for (let i = 0; i < GATE.ATTEMPTS; i++) {
+    for (let i = 0; i < maxAttempts; i++) {
       if (Date.now() - startedAt > NET.GATE_DEADLINE) {
         return { verdict: 'timeout', attempts, elapsed: Date.now() - startedAt };
       }
-      if (onProgress) onProgress({ attempt: i + 1, total: GATE.ATTEMPTS, state: 'probing' });
+      if (onProgress) onProgress({ attempt: i + 1, total: maxAttempts, state: 'probing' });
       let r;
       try {
         r = await fetchTracks(meta.aid, meta.cid);

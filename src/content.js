@@ -11,6 +11,8 @@
     bvid: '', p: 1, meta: null, sentences: [], blocks: [], notes: [],
     verdict: '', trackLan: '', status: 'init', detail: '' ,
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, lastTime: 0,
+    // 合集批量导出：running 防重入，cancel 让「停止导出」在下一 P 前生效
+    batch: { running: false, cancel: false },
     covered: [], lastTick: null, emptyHint: '', follow: true, queueHold: false,
     // 默认关：B站 AI 字幕几乎连续，判不出偏移；还要接管一次音频输出，不值当默认开
     // 走神补课：spans 记「你不在这段」的区间；shown 表示这次播放里已经弹过横幅
@@ -161,8 +163,9 @@
     '<div class="acts">',
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▾</button>',
     '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
+    '<button class="btn hidden" id="btnMulti" title="这是合集 / 多 P：逐 P 取样并过闸门，把有字幕的那些拼成一份 Markdown。慢，会显示进度">导出全部 P</button>',
     '<button class="btn hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
-    '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">复制诊断</button>',
+    '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">诊断</button>',
     '<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
     '<button class="btn accent" id="btnFold" title="收起右侧笔记面板">收起 ▸</button>',
     '<div class="foldonly foldbrand" id="foldBrand" title="展开右侧笔记面板">笔记</div>',
@@ -261,10 +264,13 @@
     statusText.textContent = text;
     statusText.title = detail || text;
     dot.className = 'dot ' + (kind === 'ok' ? 'ok' : kind === 'warn' ? 'warn' : kind === 'bad' ? 'bad' : '');
-    // 出错时才露出「复制诊断」：平时不占地方，出问题那一刻它就在手边。
+    // 「诊断」常显：原来只在 warn/bad 时出现，结果用户碰到空白面板 / 崩了的时候，按钮根本不在。
+    // 平时是灰色小按钮，真出问题（warn/bad）时点亮，一眼能看到。
     const db = $('btnDiag');
-    // warn 也要给：用户报的大多是「字幕只有一部分 / 单次取样」，那都是 warn。
-    if (db) db.classList.toggle('hidden', !kind || kind === 'ok');
+    if (db) {
+      db.classList.remove('hidden');
+      db.classList.toggle('accent', kind === 'warn' || kind === 'bad');
+    }
   }
 
   // 剪贴板：扩展页/内容脚本的权限模型不一样，先试 navigator.clipboard，失败退到 execCommand。
@@ -1687,6 +1693,16 @@
       pl.title = '';
       pl.classList.add('hidden');
     }
+    syncMultiBtn();
+  }
+
+  // 「导出全部 P」只在真的是合集 / 多 P 时出现：单片视频不该多一个按钮。
+  function syncMultiBtn() {
+    const b = $('btnMulti');
+    if (!b) return;
+    const m = state.meta || {};
+    const n = Array.isArray(m.pageList) ? m.pageList.length : 0;
+    b.classList.toggle('hidden', n < 2);
   }
 
   // 失败态一律「说人话 + 你能做什么」。术语（truncated/overflow/rejected）只留在 title 里给排查用。
@@ -1960,6 +1976,7 @@
     out.push('---');
     out.push('source: ' + pageUrl());
     out.push('title: ' + (m.title || ''));
+    if (state.bvid) out.push('bvid: ' + state.bvid);
     if (total > 1) {
       out.push('page: ' + pno + '/' + total);
       if (m.part) out.push('part: ' + m.part);
@@ -1967,6 +1984,10 @@
     out.push('subtitle_source: ' + (state.trackLan || ''));
     if (state.verdict === 'hardsub' || state.trackLan === 'onscreen-ocr') out.push('subtitle_note: 画面字幕识别，可能有错字');
     out.push('verified: ' + (state.verdict === 'stable' ? 'two-samples-agree' : 'single-sample'));
+    // Obsidian 认 properties 里的 tags；多行写法不怕标题里的特殊字符。
+    out.push('tags:');
+    out.push('  - bilibili');
+    out.push('  - 视频笔记');
     out.push('exported: ' + new Date().toISOString());
     const vcount = state.notes.reduce(function (a, n) { return a + ((n.visual && n.visual.length) || 0); }, 0);
     if (vcount > 0) out.push('visual_frames: ' + vcount);
@@ -1974,6 +1995,14 @@
     out.push('');
     out.push('# ' + heading);
     out.push('');
+    // 长视频的笔记在 Obsidian 里滚半天：开头给一份可点的大纲，和面板上的「大纲」一致。
+    const ol = sortedNotes();
+    if (ol.length > 1) {
+      out.push('## 大纲');
+      out.push('');
+      ol.forEach(function (n) { out.push('- [' + fmt(n.start) + '](' + jumpUrl(n.start) + ') ' + (n.blockSummary || '')); });
+      out.push('');
+    }
     sortedNotes().forEach(function (n) {
       out.push('## ' + fmt(n.start) + ' ' + (n.blockSummary || ''));
       out.push('');
@@ -2004,14 +2033,14 @@
     return out.join('\n');
   }
 
-  function downloadMarkdown(text) {
+  function downloadMarkdown(text, name) {
     const m = state.meta || {};
     const total = Number(m.pages) || 0;
     const pno = Number(m.page) || state.p || 1;
     const blob = new Blob([text], { type: 'text/markdown' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = ((m.title || state.bvid) + (total > 1 ? '-P' + pno : '')).replace(/[\\/:*?<>|]/g, '_') + '.md';
+    a.download = name || (((m.title || state.bvid) + (total > 1 ? '-P' + pno : '')).replace(/[\\/:*?<>|]/g, '_') + '.md');
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
   }
@@ -2040,9 +2069,81 @@
     downloadMarkdown(state.notes.length ? buildMarkdown() : buildTranscriptMarkdown());
   }
 
+  // 合集 / 多 P 批量导出：逐 P 取样、逐 P 过闸门，只把真的属于那一 P 的字幕拼进文件。
+  // 慢是必然的（每 P 至少两次取样），所以有进度、能中途停，也写明「哪几 P 没导出、为什么」。
+  async function exportAllParts() {
+    const m = state.meta || {};
+    const list = Array.isArray(m.pageList) ? m.pageList.slice() : [];
+    if (list.length < 2) { setStatus('warn', '这个视频只有一个 P，直接点「导出」就行'); return; }
+    if (!m.aid) { setStatus('bad', '拿不到这个视频的 aid', '刷新页面再试'); return; }
+    if (state.batch && state.batch.running) {
+      state.batch.cancel = true;
+      setStatus('warn', '正在停止批量导出…', '这一 P 跑完就停；已经导出的 P 仍会落盘');
+      return;
+    }
+    state.batch = { running: true, cancel: false };
+    const btn = $('btnMulti');
+    if (btn) { btn.textContent = '停止导出'; btn.classList.add('accent'); }
+    const good = [];
+    const bad = [];
+    try {
+      for (let i = 0; i < list.length; i++) {
+        if (state.batch.cancel) break;
+        const p = list[i];
+        const label = 'P' + p.page + (p.part ? ' · ' + String(p.part).slice(0, 14) : '');
+        setStatus('warn', '导出全部 P ' + (i + 1) + '/' + list.length + ' · ' + label, '每 P 取样 2~4 次过闸门；可以点「停止导出」');
+        let r = null;
+        try {
+          r = await G.gateSubtitle({ aid: m.aid, cid: p.cid, pageDur: p.duration || 0 }, function (pg) {
+            if (pg && pg.state === 'probing') {
+              setStatus('warn', '导出全部 P ' + (i + 1) + '/' + list.length + ' · ' + label + ' 取样 ' + pg.attempt + '/' + pg.total);
+            }
+          }, { attempts: 4, earlyVotes: 2 });
+        } catch (e) {
+          r = { verdict: 'api-error', reason: String(e).slice(0, 60) };
+        }
+        if (r && r.sentences && r.sentences.length && (r.verdict === 'stable' || r.verdict === 'single')) {
+          good.push({
+            page: p.page, part: p.part || '', duration: p.duration || 0,
+            verdict: r.verdict, votes: r.votes || 1,
+            trackLan: (r.track && r.track.lan) || '',
+            sentences: r.sentences,
+          });
+        } else {
+          bad.push({
+            page: p.page, part: p.part || '',
+            verdict: (r && r.verdict) || 'no-attempt',
+            reason: (r && r.reason) || '',
+            cover: (r && r.stats && typeof r.stats.cover === 'number') ? Number(r.stats.cover.toFixed(3)) : null,
+          });
+        }
+      }
+    } finally {
+      state.batch.running = false;
+      if (btn) { btn.textContent = '导出全部 P'; btn.classList.remove('accent'); }
+    }
+    const stopped = !!state.batch.cancel;
+    if (!good.length) {
+      setStatus('bad', '没有一个 P 的字幕能确认', '多半是没登录 B站，或这些 P 都没有 AI 字幕');
+      return;
+    }
+    const text = window.BnBatch.batchMarkdown(good, bad, {
+      url: 'https://www.bilibili.com/video/' + state.bvid,
+      title: m.title || state.bvid,
+      bvid: state.bvid,
+      totalPages: list.length,
+    });
+    downloadMarkdown(text, window.BnBatch.batchFileName({ title: m.title || state.bvid, bvid: state.bvid, totalPages: list.length }));
+    const stableN = good.filter(function (x) { return x.verdict === 'stable'; }).length;
+    setStatus(bad.length ? 'warn' : 'ok',
+      (stopped ? '已停止：导出了 ' : '已导出 ') + good.length + '/' + list.length + ' P（' + stableN + ' P 两次取样一致）',
+      bad.length ? '没导出的 P 和原因写在文件末尾' : '全部 P 都已导出');
+  }
+
   // 调试/验证用：不经下载直接拿到导出的 Markdown 文本
   window.__bnMarkdown = buildMarkdown;
   window.__bnTranscriptMarkdown = buildTranscriptMarkdown;
+  window.__bnExportAll = exportAllParts;
   window.__bnCopyDiag = copyDiag;
   window.__bnSetStatus = setStatus;
   // 调试：预览页里直接检查/触发小节（真机上小节靠播够 8 块自动生成）
@@ -2181,6 +2282,7 @@
   $('awayMini').addEventListener('click', function () { openCatchup(state.away.last); });
   $('btnOutline').addEventListener('click', function () { outline.classList.toggle('hidden'); });
   $('btnExport').addEventListener('click', exportMarkdown);
+  $('btnMulti').addEventListener('click', exportAllParts);
   $('btnDiag').addEventListener('click', copyDiag);
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
   $('btnOpt').addEventListener('click', function () {

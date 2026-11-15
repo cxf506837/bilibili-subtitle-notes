@@ -312,6 +312,7 @@
     out.push('---');
     out.push('source: ' + (m.url || ''));
     out.push('title: ' + (m.title || ''));
+    if (m.bvid) out.push('bvid: ' + m.bvid);
     if (Number(m.totalPages) > 1) {
       out.push('page: ' + Number(m.page) + '/' + Number(m.totalPages));
       if (m.part) out.push('part: ' + m.part);
@@ -320,6 +321,11 @@
     if (m.ocr) out.push('subtitle_note: 画面字幕识别，可能有错字');
     out.push('verified: ' + (m.verified || 'single-sample'));
     out.push('notes: transcript-only');
+    // Obsidian 认 properties 里的 tags：多行写法和行内 [a, b] 都支持，多行更不容易被特殊字符搞坏。
+    out.push('tags:');
+    out.push('  - bilibili');
+    out.push('  - 视频笔记');
+    out.push('  - 字幕');
     out.push('exported: ' + (m.exportedAt || new Date().toISOString()));
     out.push('---');
     out.push('');

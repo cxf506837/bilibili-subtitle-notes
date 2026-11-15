@@ -200,7 +200,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // v0.7.3 之前 manifest 里没有 action，装完根本找不到「用」的入口（只能在视频页等面板自己出来）。
 const VIDEO_URL = /^https:\/\/www\.bilibili\.com\/video\//;
 const CONTENT_FILES = [
-  'src/gate.js', 'src/summarize.js', 'src/hardsub.js', 'src/frames.js', 'src/content.js',
+  'src/gate.js', 'src/summarize.js', 'src/batch.js', 'src/hardsub.js', 'src/frames.js', 'src/content.js',
 ];
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
