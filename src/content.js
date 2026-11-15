@@ -2198,64 +2198,81 @@
     stream.scrollTop = stream.scrollHeight;
   }
 
-  // ---- 页面让位：面板展开时把 B站 主容器收窄，别盖住视频 ----
-  const SHIFT_SELECTORS = ['.video-container-v1', '#mirror-vdcon'];
-  let shiftEl = null;
-  let shiftSavedWidth = null;
+  // ---- 页面让位：面板展开时给页面右侧腾出面板宽度，别盖住推荐区 ----
+  // B站 视频页是「播放器（可伸缩）+ 右侧固定 350px 列」，容器有最小布局宽度（实测约 1064）。
+  // 直接改容器 width 会把播放器挤到屏幕外（实测 video.left 变 -6 ~ -118），所以换成：
+  // 给 <html> 加 padding-right，再广播一次 resize 让播放器自己按新宽度重排，最后验一遍再决定留不留。
+  const SHIFT_MIN_CONTENT = 1064;
   let shiftApplied = 0;
-  let shiftTimer = 0;
+  let shiftBlockedAt = 0;
+  let shiftVerifyTimer = 0;
   let shiftPending = 0;
+  let shiftSynth = 0; // 我们自己发出的 resize，别当成用户改窗口
 
   function shiftNeeded() {
-    if (state.collapsed || state.autoHidden) return 0; // 自动收起时整条让出去，页面恢复原宽
+    if (state.collapsed || state.autoHidden) return 0; // 收起 / 贴边时不占页面宽度
     return state.width + 6; // +6 是面板左侧那条拖拽把手
   }
 
-  function shiftFind() {
-    for (let i = 0; i < SHIFT_SELECTORS.length; i++) {
-      const el = document.querySelector(SHIFT_SELECTORS[i]);
-      if (el) return el;
-    }
-    return null;
+  function shiftRec() {
+    return document.querySelector('.recommend-list-v1, #reco_list, .right-container');
   }
 
-  function shiftRestore() {
-    if (shiftEl && shiftSavedWidth !== null) shiftEl.style.width = shiftSavedWidth;
-    shiftEl = null;
-    shiftSavedWidth = null;
+  function shiftFire() {
+    shiftSynth++;
+    try { window.dispatchEvent(new Event('resize')); } catch (e) { /* 老浏览器 */ }
+    shiftSynth--;
+  }
+
+  // 撤掉让位。B站 的播放器宽度是 JS 算的，光删 padding 不会自己变回来，要再广播一次。
+  function shiftUnshift() {
+    if (!shiftApplied) {
+      if (document.documentElement.style.paddingRight) {
+        document.documentElement.style.paddingRight = '';
+        shiftFire();
+      }
+      return;
+    }
     shiftApplied = 0;
+    document.documentElement.style.paddingRight = '';
+    shiftFire();
   }
 
-  // 收窄后如果视频被挤到屏幕外（窄窗口常见），说明这一屏不该让位，撤回去
-  let shiftBlockedAt = 0;
-  let shiftVerifyTimer = 0;
+  function shiftRestore() { shiftUnshift(); }
 
+  // 让位之后确认：播放器和推荐区都完整落在面板左边；不成立就说明这屏挤不下，撤回去。
   function shiftVerify(need) {
-    const v = getVideo();
-    if (!v || !shiftEl) return;
-    const r = v.getBoundingClientRect();
-    if (r.width <= 0) return;
+    if (!shiftApplied) return true;
     const panelLeft = window.innerWidth - need;
-    if (r.left < -1 || r.right > panelLeft + 1) {
-      shiftRestore();
+    const v = getVideo();
+    const vr = v ? v.getBoundingClientRect() : null;
+    const rec = shiftRec();
+    const rr = rec ? rec.getBoundingClientRect() : null;
+    const videoOut = vr && vr.width > 0 && (vr.left < -1 || vr.right > panelLeft + 1);
+    const recOut = rr && rr.width > 0 && rr.right > panelLeft + 1;
+    if (videoOut || recOut) {
       shiftBlockedAt = Math.round(window.innerWidth);
+      shiftUnshift();
+      return false;
     }
+    return true;
   }
 
   function shiftApply() {
     const need = shiftNeeded();
-    if (need <= 0) { shiftRestore(); return; }
+    if (need <= 0) { shiftUnshift(); return; }
     if (shiftBlockedAt === Math.round(window.innerWidth)) return;
-    const el = shiftFind();
-    if (!el) return;
-    if (el !== shiftEl) { shiftRestore(); shiftEl = el; shiftSavedWidth = el.style.width || ''; }
-    const target = 'calc(100% - ' + need + 'px)';
-    if (shiftApplied === need && el.style.width === target) return;
-    el.style.width = target;
+    // 空间不够别硬挤：挤下去播放器会跑出屏幕，比遮住推荐区更难用（这时靠贴边细条让人点到右侧）
+    if (window.innerWidth - need < SHIFT_MIN_CONTENT) { shiftUnshift(); return; }
+    if (shiftApplied === need) {
+      if (!document.documentElement.style.paddingRight) document.documentElement.style.paddingRight = need + 'px';
+      return;
+    }
+    document.documentElement.style.paddingRight = need + 'px';
     shiftApplied = need;
+    shiftFire(); // 播放器只会跟着 resize 重算宽度
     clearTimeout(shiftVerifyTimer);
-    shiftVerifyTimer = setTimeout(function () { shiftVerify(need); }, 200);
-    setTimeout(function () { shiftVerify(need); }, 900);
+    shiftVerifyTimer = setTimeout(function () { shiftVerify(need); }, 400);
   }
 
   // 拖动宽度时别每一帧都改页面布局
@@ -2264,11 +2281,13 @@
     shiftPending = setTimeout(shiftApply, 60);
   }
 
-  // B站 自己会在窗口 resize / 换页之后重写容器宽度，隔一会儿再按一次
+  // 用户真的改了窗口大小：清掉「这屏挤不下」的记忆，重新试一次
   window.addEventListener('resize', function () {
+    if (shiftSynth > 0) return;
     shiftBlockedAt = 0;
-    setTimeout(shiftApply, 120);
-    setTimeout(shiftApply, 400);
+    clearTimeout(shiftVerifyTimer);
+    shiftApply();
+    setTimeout(shiftApply, 300); // B站 自己也会在 resize 后重排一次
   });
 
     // 收起态整条贴边标签都可点开（之前只有一根 44px 灰字，用户两次说找不到）
