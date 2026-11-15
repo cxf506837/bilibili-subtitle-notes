@@ -93,7 +93,14 @@
     '.note .h { display: flex; gap: 8px; align-items: baseline; }',
     '.note .t { color: var(--bnaccent); cursor: pointer; font-variant-numeric: tabular-nums; flex: 0 0 auto; }',
     '.note .t:hover { text-decoration: underline; }',
-    '.note .sum { font-weight: 600; }',
+    '.note .h { cursor: pointer; }',
+    '.note .sum { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }',
+    '.note.open .sum { -webkit-line-clamp: 3; }',
+    '.note .chev { margin-left: auto; flex: 0 0 auto; font-size: 10px; opacity: .3; }',
+    '.note.open .chev { opacity: .55; transform: rotate(90deg); }',
+    '.note .chev { transition: transform .12s ease; }',
+    '.note .one { font-size: 12px; opacity: .62; margin-top: 4px; }',
+    '.note:not(.open) .pt, .note:not(.open) .vwrap, .note:not(.open) .one { display: none; }',
     '.pt { margin: 6px 0 0; }',
     '.pt .q { border-left: 2px solid var(--bnquote); padding-left: 8px; opacity: .75; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }',
     '.pt .p { margin-top: 2px; }',
@@ -585,6 +592,9 @@
     stream.innerHTML = '<div class="empty">' + html + '</div>';
   }
 
+  // 展开的笔记（按开始秒数记，重渲染后保持）
+  const openNotes = {};
+
   function noteEl(note) {
     const el = document.createElement('div');
     el.className = 'note';
@@ -600,6 +610,17 @@
     sum.textContent = note.blockSummary || note.oneThing || '';
     h.appendChild(t);
     h.appendChild(sum);
+    const chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = '\u25B6';
+    h.appendChild(chev);
+    if (openNotes[String(note.start)]) el.classList.add('open');
+    h.addEventListener('click', function (ev) {
+      if (ev.target === t) return;
+      const k = String(note.start);
+      if (openNotes[k]) delete openNotes[k]; else openNotes[k] = true;
+      el.classList.toggle('open', !!openNotes[k]);
+    });
     if (note.hardsub) {
       const hs = document.createElement('span');
       hs.className = 'hstag';
@@ -654,11 +675,10 @@
       vw.appendChild(vt);
       el.appendChild(vw);
     }
-    if (note.oneThing) {
+    if (note.oneThing && note.oneThing !== (note.blockSummary || '')) {
       const one = document.createElement('div');
-      one.className = 'mono';
-      one.style.marginTop = '6px';
-      one.textContent = '只记一件事：' + note.oneThing;
+      one.className = 'one';
+      one.textContent = note.oneThing;
       el.appendChild(one);
     }
     return el;
@@ -821,6 +841,7 @@
       outline.appendChild(d);
       return d;
     }
+    let noteIdx = 0;
     sortedNotes().forEach(function (n) {
       let sec = null;
       for (let i = 0; i < secs.length; i++) {
@@ -834,7 +855,8 @@
         d.title = (sec.oneLine ? sec.oneLine + '\n' : '') + '点一下跳到这一节开头';
         lastSec = sec;
       }
-      row('item', fmt(n.start), n.blockSummary || n.oneThing || '', function () { seekTo(n.start); scrollToNote(n.start); });
+      const nr = row('item', fmt(n.start), n.blockSummary || n.oneThing || '', function () { seekTo(n.start); scrollToNote(n.start); });
+      nr.dataset.idx = String(noteIdx++);
     });
     outline.scrollTop = keep;
     markOutline();
@@ -848,7 +870,10 @@
     for (let i = 0; i < list.length; i++) {
       if (list[i].start <= t + 0.01) cur = i; else break;
     }
-    for (let i = 0; i < items.length; i++) items[i].classList.toggle('active', i === cur);
+    for (let i = 0; i < items.length; i++) {
+      const di = items[i].dataset.idx;
+      items[i].classList.toggle('active', di !== undefined && Number(di) === cur);
+    }
     const act = cur >= 0 ? list[cur] : null;
     const secs = outline.querySelectorAll('.item.sec');
     for (let i = 0; i < secs.length; i++) {
@@ -860,7 +885,12 @@
   function scrollToNote(start) {
     const list = stream.querySelectorAll('.note');
     for (let i = 0; i < list.length; i++) {
-      if (Number(list[i].dataset.start) === Number(start)) { list[i].scrollIntoView({ block: 'center' }); return; }
+      if (Number(list[i].dataset.start) === Number(start)) {
+        openNotes[String(start)] = true;
+        list[i].classList.add('open');
+        list[i].scrollIntoView({ block: 'center' });
+        return;
+      }
     }
   }
 
@@ -2237,6 +2267,7 @@
       ol.forEach(function (n) { out.push('- [' + fmt(n.start) + '](' + jumpUrl(n.start) + ') ' + (n.blockSummary || '')); });
       out.push('');
     }
+    let noteIdx = 0;
     sortedNotes().forEach(function (n) {
       out.push('## ' + fmt(n.start) + ' ' + (n.blockSummary || ''));
       out.push('');
