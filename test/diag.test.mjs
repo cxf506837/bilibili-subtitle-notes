@@ -56,6 +56,8 @@ ok('ocr 为 false 时写明不可用', S.diagText({ ocr: false }).indexOf('不�
 const single = S.diagText({ version: '0.7.3', url: 'https://www.bilibili.com/video/BV1xx', title: 'T', verdict: 'single', sentences: 3, totalPages: 1, page: 1 });
 ok('单 P 不写 P1/1', single.indexOf('（P') < 0, single);
 ok('单次取样不编造次数', single.indexOf('次取样一致') < 0);
+ok('缓存恢复的字幕会说明来源', S.diagText({ version: '1.4.8', verdict: 'stable', cache: 'yes' }).indexOf('字幕来源: 上次存下来的') > 0);
+ok('现取的字幕不写来源', S.diagText({ version: '1.4.8', verdict: 'stable', cache: 'no' }).indexOf('字幕来源') < 0);
 
 const messy = S.diagText({ version: '0.7.3', title: 'A\nB   C', detail: 'line1\nline2' });
 ok('标题与详情里的换行被压平', messy.indexOf('标题: A B C') > 0 && messy.indexOf('line1 line2') > 0, messy);

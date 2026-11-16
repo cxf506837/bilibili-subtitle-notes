@@ -374,6 +374,7 @@
       out.push('字幕: ' + parts.join(' · '));
     }
     if (i.titleOverlap) out.push('字幕与标题重合: ' + clean(i.titleOverlap) + (String(i.titleOverlap).indexOf('0/')===0 ? '（一个词都对不上）' : ''));
+    if (i.cache === 'yes') out.push('字幕来源: 上次存下来的（点「重新核对」可重新取一份对照）');
     if (i.endpoint || i.model) {
       const ep = [];
       if (i.endpoint) ep.push(clean(i.endpoint));

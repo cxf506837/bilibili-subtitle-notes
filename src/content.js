@@ -12,6 +12,8 @@
     verdict: '', trackLan: '', status: 'init', detail: '',
     // 内容级提示：字幕正文与标题一个词都对不上（时长闸门挡不住「长度像但内容无关」）
     titleCheck: null,
+    // 这份字幕是从本地缓存恢复的（不是这轮现取的）：界面给一个「重新核对」入口
+    fromCache: false,
     // 有没有填 API Key：null=还不知道（storage 读回来之前别误报），没填时点「总结这段 / 整理全片」直接引到设置
     hasKey: null,
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, autoHidden: false, lastTime: 0,
@@ -971,7 +973,9 @@
     if (seq !== bootSeq) return;
     state.readability = { verdict, source, flags: local.flags, note };
     renderReadability();
-    if (state.meta && state.sentences.length) {
+    // 缓存恢复出来的字幕不要重写记录（否则 savedAt 会一直刷新，看起来永远像「刚取的」）；
+    // 也不能在这里清 fromCache——那会让「重新核对」入口刚出现就消失。
+    if (state.meta && state.sentences.length && !state.fromCache) {
       dbPut('sub|' + state.bvid + ':' + state.meta.cid, {
         sentences: state.sentences, trackLan: state.trackLan, verdict: state.verdict,
         readability: state.readability, savedAt: Date.now(),
@@ -1003,7 +1007,15 @@
   function syncVerifyBtn() {
     const b = $('btnVerify');
     if (!b) return;
-    b.classList.toggle('hidden', !(state.verdict === 'single' && !state.batch.running && !state.hard.active));
+    const show = !state.batch.running && !state.hard.active && (state.verdict === 'single' || state.fromCache);
+    b.classList.toggle('hidden', !show);
+    if (!show) return;
+    // 缓存恢复出来的字幕可能是很久以前那一份（甚至内容不是这个视频的）：
+    // 明说「重新核对」，点了就丢掉缓存重取一份对照，取不到会退回原来那份。
+    b.textContent = state.fromCache ? '重新核对' : '再取样';
+    b.title = state.fromCache
+      ? '现在用的是上次存下的字幕。点一下重新取一份对照：两次一致才算核过；取不到还会用上次那份'
+      : '这份字幕只取到过一份、没交叉核对：再取一次，两次一致才算核过';
   }
 
   // 剪贴板：扩展页/内容脚本的权限模型不一样，先试 navigator.clipboard，失败退到 execCommand。
@@ -1048,6 +1060,7 @@
       status: state.status,
       detail: state.detail,
       titleOverlap: state.titleCheck ? (state.titleCheck.hits + '/' + state.titleCheck.tokens) : '',
+      cache: state.fromCache ? 'yes' : 'no',
       at: new Date().toISOString(),
     };
     return new Promise(function (resolve) {
@@ -2688,6 +2701,27 @@
     maybeSections();
   }
 
+  // 把本地缓存的字幕装回界面。缓存可能是很久以前那一份（用户实测遇到过内容其实是别的视频的），
+  // 所以置 fromCache=true，工具栏会多一个「重新核对」。
+  async function applyCachedSub(hit) {
+    state.sentences = hit.sentences;
+    state.trackLan = hit.trackLan || '';
+    state.verdict = hit.verdict || 'single';
+    state.fromCache = true;
+    state.readability = hit.readability || { verdict: '', source: '', flags: null, note: '' };
+    state.titleCheck = (state.meta && state.meta.title) ? G.titleOverlap(state.meta.title, state.sentences) : null;
+    state.blocks = S.chunkSentences(state.sentences);
+    renderReadability();
+    if (!hit.readability) checkReadability();
+    const gotN = await hydrateNotes();
+    setStatus(state.verdict === 'stable' ? 'ok' : 'warn', statusLabel() + ' · 本地缓存');
+    state.emptyHint = gotN
+      ? '已恢复上次的 ' + gotN + ' 段笔记。<br>继续播放，接着往下记；跳过的段落会画成虚线。'
+      : '共 ' + state.sentences.length + ' 句、' + state.blocks.length + ' 段（用的是上次通过检查的字幕）。<br>开始播放，笔记会跟着进度出现。';
+    renderStream();
+    bindVideo();
+  }
+
   // 分 P 切换会连续触发两次 boot（href 变化 + 时长自校正），加个令牌：只有最后一次的继续往下走。
   let bootSeq = 0;
   async function boot(force, wantP) {
@@ -2750,28 +2784,13 @@
     const cached = SESSIONS.get(state.bvid + '|' + state.meta.aid + ':' + state.meta.cid);
     if (cached && !force && cached.sentences && cached.sentences.length) { restore(cached); setPageLabel(); return; }
 
-    // 本地缓存：上一次已经通过闸门的字幕，直接复用，不再赌接口这次返回哪份文件
-    if (!force) {
-      const hit = await dbGet('sub|' + state.bvid + ':' + state.meta.cid);
-      if (seq !== bootSeq) return;
-      if (hit && hit.sentences && hit.sentences.length) {
-        state.sentences = hit.sentences;
-        state.trackLan = hit.trackLan || '';
-        state.verdict = hit.verdict || 'single';
-        state.readability = hit.readability || { verdict: '', source: '', flags: null, note: '' };
-        state.titleCheck = (state.meta && state.meta.title) ? G.titleOverlap(state.meta.title, state.sentences) : null;
-        state.blocks = S.chunkSentences(state.sentences);
-        renderReadability();
-        if (!hit.readability) checkReadability();
-        const gotN = await hydrateNotes();
-        setStatus(state.verdict === 'stable' ? 'ok' : 'warn', statusLabel() + ' · 本地缓存');
-        state.emptyHint = gotN
-          ? '已恢复上次的 ' + gotN + ' 段笔记。<br>继续播放，接着往下记；跳过的段落会画成虚线。'
-          : '共 ' + state.sentences.length + ' 句、' + state.blocks.length + ' 段（用的是上次通过检查的字幕）。<br>开始播放，笔记会跟着进度出现。';
-        renderStream();
-        bindVideo();
-        return;
-      }
+    // 本地缓存：上一次已经通过闸门的字幕，直接复用，不再赌接口这次返回哪份文件。
+    // force=true（点「再取样 / 重新核对」）也要读出来：新取样失败时退回它，别把能用的字幕弄丢。
+    const hit = await dbGet('sub|' + state.bvid + ':' + state.meta.cid);
+    if (seq !== bootSeq) return;
+    if (!force && hit && hit.sentences && hit.sentences.length) {
+      await applyCachedSub(hit);
+      return;
     }
     let r;
     try {
@@ -2808,6 +2827,12 @@
       return;
     }
     if (r.verdict !== 'stable' && r.verdict !== 'single') {
+      // 用户点「重新核对」时新取样没通过（接口这次给的文件更差）：退回原来那份，别把界面弄成不可用
+      if (force && hit && hit.sentences && hit.sentences.length) {
+        await applyCachedSub(hit);
+        setStatus('warn', statusLabel() + ' · 上次的字幕', '重新核对没通过（' + (r.reason || r.verdict) + '），先用上次那份');
+        return;
+      }
       const t = STATE_TEXT[r.verdict] || ['bad', '字幕不可用'];
       const last = (r.attempts || []).slice(-1)[0] || {};
       setStatus(t[0], t[1], (r.reason || r.verdict) + (last.state ? ' · 最后一次：' + last.state : ''));
@@ -2837,6 +2862,7 @@
       return;
     }
     state.sentences = r.sentences;
+    state.fromCache = false;
     state.trackLan = (r.track && r.track.lan) || '';
     state.blocks = S.chunkSentences(state.sentences);
     state.readability = { verdict: '', source: '', flags: null, note: '' };
