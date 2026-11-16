@@ -1,6 +1,6 @@
 # B站字幕笔记
 
-[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 584 条离线测试 · MIT
+[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 613 条离线测试 · MIT
 
 跟播放头边看边写；每条结论都带**逐字引文 + 可点的时间**，点一下跳回原句。浏览器扩展（Edge / Chrome，MV3）。
 
@@ -20,7 +20,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、584 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、613 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 装（约 3 分钟）
 
@@ -41,6 +41,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 合集 / 多 P：面板多一个「导出全部 P」，把所有分 P 的字幕导进同一个 Markdown（中途可以停）；哪一 P 没导出来、为什么，写在文件末尾
 - **只导你要的那一段**：课程清单里每集前面有勾选框，按 S1 / S2 分组、每组可「全选」；勾几集就只导这几集，文件名叫「（S2 · 9 集）」，frontmatter 里 `scope: S2`。第一次没导出来的集会在结尾自动再取一轮（字幕接口会抖），还不行才写进「未导出的集」并给原因
 - **交给 agent**：课程清单里勾几集，点「交给 agent（N 集）」，下载一份学习包（`.json` + `.md`）：每集字幕可不可信、抽到的概念、每个概念在第几集第几秒被讲到的**逐字原话**。agent 拿它就能按你的目标裁剪、画依赖图、出题考你，不用自己看视频。格式说明见 [docs/agent-integration.md](docs/agent-integration.md)
+- **学完把掌握度带回面板**：agent 拷打完把 `study-state.json` 复制到剪贴板，点扩展图标 → 「应用到面板」；回到视频页，课程条下面就是「掌握度 懂 5 · 半懂 11 · 没考 75」，点开能看到「接着学」该跳哪一秒，和已经能讲清的概念。只读你复制的那一份，不联网
 - **配一个 agent 学完它**：仓库里带 `skills/bili-study`（复制到 agent 的 skills 目录即可）。它会按你的目标裁掉不需要的概念、出依赖图、用**逐字原话**一道一道考你，答完把「懂 / 半懂 / 没考」写进 `study-state.json`。流程见 [skills/bili-study/SKILL.md](skills/bili-study/SKILL.md)
 - **合集 / 多 P 顶部有课程条**：课程名 + 「24 集 · 2 小时 57 分 · 已看 1 集」，点开是每集清单（✓ 是看过的，当前集高亮），点一集直接跳过去；「继续」跳到下一集没看过的。进度记在本机，关掉浏览器再回来还在
 - **没填 API Key 也能用**：抓完字幕直接点「导出」，拿到的是逐句字幕全文（每句一个时间戳、可点回原句），只是没有 AI 整理的结论
@@ -62,7 +63,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 584 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 613 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```

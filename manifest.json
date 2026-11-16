@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "B站字幕笔记",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "把 B站 视频的字幕变成可核对的笔记：先验证这份字幕属不属于这个视频，再整理成带原句和时间戳的要点。不填 API Key 也能导出字幕全文。",
   "permissions": [
     "storage",
     "unlimitedStorage",
     "offscreen",
-    "scripting"
+    "scripting",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://www.bilibili.com/*",
@@ -58,6 +59,7 @@
         "src/course.js",
         "src/concepts.js",
         "src/study.js",
+        "src/studystate.js",
         "src/content.js"
       ],
       "run_at": "document_idle"

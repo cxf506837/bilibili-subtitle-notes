@@ -172,6 +172,18 @@
   // 课程条：合集 / 多 P 视频显示「课程 → 集」，点一集直接跳过去
   '.course { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; overflow: hidden; background: var(--bnfill); }',
   '.course.hidden { display: none; }',
+  '.mast { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; background: var(--bnbg); padding: 7px 9px; }',
+  '.mast.hidden { display: none; }',
+  '.mast .mh { display: flex; align-items: center; gap: 6px; cursor: pointer; }',
+  '.mast .mt { font-size: 11px; font-weight: 600; color: var(--bnfg); flex: 0 0 auto; }',
+  '.mast .mm { font-size: 11px; color: var(--bnmuted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+  '.mast .mrow { display: none; margin-top: 5px; }',
+  '.mast.open .mrow { display: block; }',
+  '.mast .mr { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; cursor: pointer; font-size: 12px; line-height: 1.55; }',
+  '.mast .mr:hover .mn { color: var(--bnaccentInk); }',
+  '.mast .mn { color: var(--bnfg); flex: 1; min-width: 0; }',
+  '.mast .mw { font-size: 11px; color: var(--bnaccentInk); flex: 0 0 auto; }',
+  '.mast .mf { font-size: 11px; color: var(--bnmuted); margin-top: 4px; line-height: 1.55; }',
   '.chd { padding: 6px 8px; cursor: pointer; }',
   '.chd .c1 { display: flex; align-items: center; gap: 6px; }',
   '.chd .c2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; }',
@@ -241,6 +253,14 @@
     '</div>',
     '</div>',
     '<div class="clist" id="courseList"></div>',
+    '</div>',
+    '<div class="mast hidden" id="mast">',
+    '<div class="mh" id="mastHead" title="agent 拷打完的结果：点开看接下来该学哪几个">',
+    '<span class="mt">掌握度</span>',
+    '<span class="mm" id="mastMeta"></span>',
+    '<button class="btn sm hidden" id="mastNext">接着学</button>',
+    '</div>',
+    '<div class="mrow" id="mastRows"></div>',
     '</div>',
     '<div class="away hidden" id="away">',
     '<span class="at" id="awayText"></span>',
@@ -354,6 +374,7 @@
       const nx = window.BnCourse.nextUnwatched(m, courseProgress, courseCur);
       courseNextEl.classList.toggle('hidden', !nx);
       if (nx) courseNextEl.title = '跳到第 ' + nx.index + ' 集：' + nx.title;
+      refreshStudy();
     } catch (e) {
       courseEl.classList.add('hidden');
     }
@@ -743,6 +764,105 @@
     }
   }
 
+  // ---- 掌握度：agent 拷打完把 study-state 复制到剪贴板，点扩展图标「应用」后存在这里 ----
+  const mastEl = $('mast');
+  const mastHeadEl = $('mastHead');
+  const mastMetaEl = $('mastMeta');
+  const mastNextEl = $('mastNext');
+  const mastRowsEl = $('mastRows');
+  let studyStates = [];
+  let mastSeen = '';
+
+  function loadStudyStates() {
+    try {
+      chrome.storage.local.get(null, function (all) {
+        studyStates = (window.BnStudyState ? window.BnStudyState.fromStorage(all) : [])
+          .map(function (x) { return x.state; });
+        refreshStudy();
+      });
+    } catch (e) {}
+  }
+
+  function currentStudy() {
+    const m = courseModel;
+    if (!m || !window.BnStudyState) return null;
+    for (let i = 0; i < studyStates.length; i++) {
+      if (window.BnStudyState.match(studyStates[i], m.id)) return studyStates[i];
+    }
+    return null;
+  }
+
+  // 跳到「那一集那一秒」：同一条视频就 seek，别整页刷新
+  function openStudyUrl(url) {
+    const u = String(url || '');
+    if (!u) return;
+    const bv = (/\/video\/(BV[0-9A-Za-z]+)/.exec(u) || [])[1] || '';
+    const t = Number((/[?&]t=(\d+)/.exec(u) || [])[1] || 0);
+    if (bv && bv === String(state.bvid)) {
+      const v = getVideo();
+      if (v) { try { v.currentTime = Math.max(0, t); v.play(); } catch (e) {} }
+      return;
+    }
+    location.href = u;
+  }
+
+  function studyRow(name, tail, url, title) {
+    const row = document.createElement('div');
+    row.className = 'mr';
+    if (title) row.title = title;
+    const n = document.createElement('span');
+    n.className = 'mn';
+    n.textContent = name;
+    const w = document.createElement('span');
+    w.className = 'mw';
+    w.textContent = tail || '';
+    row.appendChild(n);
+    row.appendChild(w);
+    if (url) {
+      row.addEventListener('click', function (ev) { ev.stopPropagation(); openStudyUrl(url); });
+    }
+    return row;
+  }
+
+  function refreshStudy() {
+    try {
+      const st = currentStudy();
+      if (!st) {
+        mastEl.classList.add('hidden');
+        return;
+      }
+      const p = window.BnStudyState.summarize(st);
+      mastEl.classList.remove('hidden');
+      if (mastSeen !== st.course_id) { mastSeen = st.course_id; mastEl.classList.add('open'); }
+      mastMetaEl.textContent = '懂 ' + p.understood + ' · 半懂 ' + p.shaky + ' · 没考 ' + p.unknown;
+      mastMetaEl.title = (st.course || '') + ' · 共 ' + p.total + ' 个概念 · agent 拷打的结果';
+      const nx = window.BnStudyState.nextList(st, 3);
+      mastNextEl.classList.toggle('hidden', !nx.length);
+      mastNextEl.textContent = nx.length ? '接着学' : '';
+      mastNextEl.title = nx.length ? '跳到「' + nx[0].name + '」那一段' : '';
+      mastNextEl.onclick = function (ev) {
+        ev.stopPropagation();
+        if (nx.length) openStudyUrl(nx[0].url);
+      };
+      mastRowsEl.textContent = '';
+      nx.forEach(function (n) { mastRowsEl.appendChild(studyRow(n.name, n.reason || '再考一次', n.url)); });
+      const known = window.BnStudyState.byStatus(st, 'understood', 6).map(function (c) { return c.name; });
+      if (known.length) {
+        const f = document.createElement('div');
+        f.className = 'mf';
+        f.textContent = '已经能讲清：' + known.join('、');
+        mastRowsEl.appendChild(f);
+      }
+    } catch (e) {
+      mastEl.classList.add('hidden');
+    }
+  }
+
+  mastHeadEl.addEventListener('click', function (ev) {
+    if (ev.target && ev.target.id === 'mastNext') return;
+    mastEl.classList.toggle('open');
+  });
+
   function openEpisode(i) {
     const m = courseModel;
     if (!m || !m.episodes[i]) return;
@@ -775,6 +895,7 @@
     openEpisode(nx.index - 1);
   });
   loadCourseProgress();
+  loadStudyStates();
 
   // 「这份字幕像机翻」必须写在界面上，不能只留在代码里。
   // 宁可说「仅供参考」，也不能让用户以为笔记不顺是因为模型笨。
@@ -3064,6 +3185,7 @@
   if (chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(function (ch) {
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
+      if (Object.keys(ch).some(function (k) { return k.indexOf('bnstudy:') === 0; })) loadStudyStates();
       if (ch['bn.visualEnabled']) {
         state.visual.enabled = ch['bn.visualEnabled'].newValue !== false;
         if (state.visual.enabled) startVisual();

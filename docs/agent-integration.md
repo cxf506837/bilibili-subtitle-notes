@@ -137,7 +137,9 @@ node skills/bili-study/tools/study.mjs mark  ./study/<课程>/study-state.json "
 
 ## 8. 掌握度回流：bn-study-state/1
 
-agent 拷打完写到 study-state.json，下一步（阶段 D）会让插件面板读它，标出「哪些懂、哪些半懂、下次从哪继续」。
+agent 拷打完写到 study-state.json，再让插件面板读它，标出「哪些懂、哪些半懂、下次从哪继续」。
+
+**回流怎么走（已实现，v1.4.3 起）**：agent 收尾时把整个 JSON 复制到系统剪贴板（Windows：`Get-Content study-state.json -Raw | Set-Clipboard`；macOS：`pbcopy < study-state.json`），告诉用户「点扩展图标 → 应用到面板」。用户点开弹窗后，弹窗读一次剪贴板、校验 spec，显示「课程名 · 懂 X · 半懂 Y · 没考 Z」，点「应用到面板」写进 `chrome.storage.local` 的 `bnstudy:<course_id>`；B站 页面上的面板立刻（不用刷新）在课程条下面出现「掌握度」，点开是「接着学」三条（带跳转秒数）和「已经能讲清」。
 
 ```json
 {
@@ -161,3 +163,5 @@ agent 拷打完写到 study-state.json，下一步（阶段 D）会让插件面�
 - asked / correct 是拷打次数与答对次数，用来算同一个概念是不是卡住了（连续两次 shaky 就该回去看视频，而不是继续考）。
 - last_quote 必须是**那次判分时贴给用户的原话**，last_url 是它的时间戳链接 —— 回流到面板后，用户点「这个我不太懂」能直接跳回那一秒。
 - 字段只加不改；改语义升 /2。
+- 面板只认 `course_id` 一致的那一份：合集是 `season:<合集id>`，多 P / 单视频是 `video:<BV号>`。写错 course_id 会「应用成功但面板不显示」。
+- 同一门课只留最后一次应用的版本（按 updated_at 显示「已经应用过了」），不做历史合并。

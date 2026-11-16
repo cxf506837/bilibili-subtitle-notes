@@ -75,3 +75,13 @@ body {
 }
 .cur .btn { flex: 0 0 auto; white-space: nowrap; }
 .cur.has .ct { color: #0091c5; }
+
+.study { margin: 8px 12px 0; border: 1px solid #e3e5e7; border-radius: 6px; background: #f6f7f8; padding: 9px 10px; }
+.study[hidden] { display: none; }
+.study .sh { display: flex; align-items: baseline; gap: 8px; }
+.study .st { font-size: 12px; font-weight: 600; color: #18191c; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.study .sm { font-size: 12px; color: #0091c5; flex: 0 0 auto; }
+.study .sr { display: flex; gap: 6px; margin-top: 7px; }
+.study .sr .btn { flex: 0 0 auto; }
+.study .sn { font-size: 11px; color: #9499a0; line-height: 1.5; margin-top: 6px; }
+.study .sn b { color: #18191c; font-weight: 600; }

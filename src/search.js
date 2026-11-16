@@ -104,6 +104,86 @@
     });
   }
 
+
+  // ---- 学习状态：agent 拷打完把 study-state.json 复制到剪贴板，点图标就能应用 ----
+  const S = window.BnStudyState;
+  const studyEl = document.getElementById('study');
+  const studyTitle = document.getElementById('studyTitle');
+  const studyMeta = document.getElementById('studyMeta');
+  const studyApply = document.getElementById('studyApply');
+  const studySkip = document.getElementById('studySkip');
+  const studyNote = document.getElementById('studyNote');
+  let pendingState = null;
+
+  function renderStudy(state, alreadyApplied) {
+    if (!state) { studyEl.hidden = true; return; }
+    pendingState = state;
+    studyTitle.textContent = state.course || state.course_id;
+    studyTitle.title = state.course || state.course_id;
+    studyMeta.textContent = S.line(state);
+    studyEl.hidden = false;
+    if (alreadyApplied) {
+      studyApply.hidden = true;
+      studySkip.textContent = '关闭';
+      studyNote.innerHTML = '这个版本已经应用过了。回 B站 视频页，面板的课程条下面就是<b>掌握度</b>和<b>接着学</b>。';
+      return;
+    }
+    studyApply.hidden = false;
+    studySkip.textContent = '忽略';
+    studyNote.innerHTML = '来自剪贴板里的 study-state.json。应用后回视频页面板看：<b>哪些懂、哪些半懂</b>，以及<b>接着学</b>该看哪一秒。';
+  }
+
+  function latestStored(list) {
+    let best = null;
+    list.forEach(function (x) {
+      if (!best || String(x.state.updated_at || '') > String(best.state.updated_at || '')) best = x;
+    });
+    return best;
+  }
+
+  function readClipboardStudy(all) {
+    const stored = S.fromStorage(all);
+    let text = '';
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(function (t) { handle(t || ''); }, function () { handle(''); });
+        return;
+      }
+    } catch (e) {}
+    handle(text);
+
+    function handle(t) {
+      const r = t ? S.parse(t) : { ok: false };
+      if (r.ok) {
+        const prev = all[S.storageKey(r.state.course_id)];
+        const same = !!(prev && prev.updated_at && prev.updated_at === r.state.updated_at);
+        renderStudy(r.state, same);
+        return;
+      }
+      const best = latestStored(stored);
+      if (best) {
+        // 剪贴板里没有新结果，就显示上次应用过的那份，让人知道面板里有东西
+        renderStudy(best.state, true);
+        studyNote.innerHTML = '剪贴板里没有新的学习状态。这是上次应用的：' + S.line(best.state) + '。';
+      } else {
+        studyEl.hidden = true;
+      }
+    }
+  }
+
+  studyApply.addEventListener('click', function () {
+    if (!pendingState) return;
+    const obj = {};
+    obj[S.storageKey(pendingState.course_id)] = pendingState;
+    chrome.storage.local.set(obj, function () {
+      studyApply.hidden = true;
+      studySkip.textContent = '关闭';
+      studyNote.innerHTML = '已应用：<b>' + esc(S.line(pendingState)) + '</b>。回 B站 视频页刷新一下，面板的课程条下面就能看到掌握度和「接着学」。';
+      studyMeta.textContent = S.line(pendingState);
+    });
+  });
+  studySkip.addEventListener('click', function () { studyEl.hidden = true; });
+
   function renderRecent() {
     const rec = B.recent(entries, 10);
     const totalNotes = entries.reduce(function (a, e) { return a + (e.count || 0); }, 0);
@@ -192,6 +272,7 @@
     entries = B.fromStorage(all);
     renderRecent();
     renderCurrent();
+    readClipboardStudy(all);
     q.focus();
   });
 })();

@@ -82,7 +82,8 @@ node skills/bili-study/tools/study.mjs mark ./study/<课程名>/study-state.json
 ## 7. 收尾
 
 - 报一句进度：`study.mjs` 的 summarize 会给「懂 N / 半懂 N / 没考 N」。
-- 把 `study-state.json` 的路径给用户，并说明：现在的版本要手动打开这个文件；「一键回流到插件面板」是下一步（阶段 D）才有的。
+- **把 study-state.json 复制到剪贴板**（这是回流的唯一动作）：Windows 用 `Get-Content <路径> -Raw | Set-Clipboard`，macOS 用 `pbcopy < <路径>`，然后告诉用户「点浏览器工具栏的扩展图标 → 应用到面板」。用户点开弹窗后就能看到「懂 / 半懂 / 没考」，应用后视频页的面板里会出现「接着学」。
+- 也把路径写出来（用户可能想存档）。
 - 给下一步建议：`next` 里排的是「半懂（再考一次）」和「还没考」的前三个，带上时间戳链接。
 
 ## 8. 做不到的（别许诺）

@@ -121,7 +121,7 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 
 变异测试：把 `src/options.js` 里两道 `if (!allow.ok) return show(originError(allow), true);` 删掉后重跑 `test/options.test.mjs`，6 条变红；恢复后 21 条全绿。
 
-`node test/run-all.mjs` 现在 **584 条断言**（gate 40 / vote 10 / pages 15 / section 25 / visual 9 / hardsub 61 / pipeline 11 / endpoint 30 / options 21 / transcript 30 / batch 28 / diag 20 / chat 18 / searchindex 45 / course 50 / season 17 / concepts 34 / study 35 / studyplan 45 / realdata 40）。
+`node test/run-all.mjs` 现在 **613 条断言**（gate 40 / vote 10 / pages 15 / section 25 / visual 9 / hardsub 61 / pipeline 11 / endpoint 30 / options 21 / transcript 30 / batch 28 / diag 20 / chat 18 / searchindex 45 / studystate 29 / course 50 / season 17 / concepts 34 / study 35 / studyplan 45 / realdata 40）。
 ## 八、没配 API Key 也能拿到字幕全文（W2-3）
 
 为什么要有这条：闸门跑完的那一刻，字幕已经在手里了，但以前只有模型返回之后才有「笔记」，所以没填 Key 的用户点「导出」得到的是一份只有标题和 BV 号的空文件——看起来像产品坏了。
@@ -247,7 +247,7 @@ v1.1.0 加了三件 v1.0.1 没有的东西：多 P 一键导出、Markdown 带 `
 | 100 P 视频 `BV1ezW162EDt` | 能跑、能停：跑到「2/100」时再点一次按钮（此时文案是「停止导出」），状态条变成「已停止：导出了 2/100 P（1 P 两次取样一致）」，按钮复位 |
 | 单 P 视频 `BV1GyZYYNErW` | `btnMulti` 是隐藏的（只有一个 P 不显示）；`__bnMarkdown()` 92,187 字节，frontmatter 有 `bvid` + `tags`（bilibili、视频笔记），正文 `## 大纲` 段首行是「- [0:00](…) 恩迪是铁傀儡祖先…」 |
 | `诊断` 按钮 | 状态条绿色时也在（v1.0.1 这时是隐藏的），文案从「复制诊断」改成「诊断」；warn/bad 时加 `accent` 高亮 |
-| 离线测试 | 584 条（batch 28、transcript 4、chat 18、searchindex 33、course 50、season 17、concepts 34、study 35、studyplan 45） |
+| 离线测试 | 613 条（batch 28、transcript 4、chat 18、searchindex 45、studystate 29、course 50、season 17、concepts 34、study 35、studyplan 45） |
 
 两个当时的判断，写下来免得以后以为是 bug：
 
@@ -328,3 +328,22 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 为什么必须用点推荐卡片：B站 是 pjax 站内导航（同一 document，前后 `window.__mixMark` 都是 777）。整页 navigate 会销毁文档，旧回包根本回不来，也就测不出这个 bug。
 
 > 诚实记录：这次只防「以后不再串」。已经被写脏的库（旧视频笔记躺在另一个视频下面）不会自动认出来——那需要人工删。
+
+## 十六、掌握度回流：剪贴板 → 弹窗 → 面板（2026-11-16 真机）
+
+测法：真 Edge 157 + `dist\edge-profile`（已登录）+ 真扩展（v1.4.3），打开 S2 第 21 集（BV1BgH36DE7y），用 CDP 把 `study/ai-s2/study-state.json`（91 个概念、懂 5 / 半懂 11 / 没考 75）写进系统剪贴板，再调 `chrome.action.openPopup()` 打开真弹窗。
+
+| 步骤 | 实测 |
+|---|---|
+| 打开视频页（未应用时） | 课程条在，`#mast` 是 `hidden`（没有掌握度条） |
+| 点开扩展图标 | 弹窗卡片出现：课程名「【从零开始的 AI 学习】」+「懂 5 · 半懂 11 · 没考 75」 |
+| 点「应用到面板」 | 弹窗提示「已应用…」；`chrome.storage.local` 出现 `bnstudy:season:8719249`，`updated_at` 与文件一致，`next` 3 条 |
+| 不刷新页面 | 面板 `#mast` 立刻变可见（storage.onChanged 热更新），文案「懂 5 · 半懂 11 · 没考 75」，三行「接着学」（第一版功能收敛 / choose boring technology / 技术栈选型，各带「上次没讲清，再考一次」），底下一行「已经能讲清：需求文档不必写太细、agents.md、指路牌、底线规矩、测试兜底」 |
+| 同一份再打开弹窗 | 显示「这个版本已经应用过了」，不给重复应用按钮 |
+
+截图：`_lab/tour/90-mastery.png`（1280×800，真页面真数据）。
+
+两个坑：
+- 弹窗读剪贴板要用 `navigator.clipboard.readText()`，需要 `clipboardRead` 权限；权限只给扩展页（弹窗），内容脚本在 B站 页面里读不到。
+- 测试时用 `atob` 解 base64 会得到 latin1 字符串，中文在面板里变成乱码（`ç¬¬ä¸€ç‰ˆ`）——那是测试脚本的错，不是产品的错；必须用 `TextDecoder` 解成 UTF-8 再写剪贴板。
+

@@ -17,6 +17,7 @@ const FILES = [
   'diag.test.mjs',      // 一键复制的诊断信息
   'chat.test.mjs',      // 后台请求体 / 400 错误映射（提问走 json:false）
   'searchindex.test.mjs', // 跨视频笔记检索（索引压缩 / 关键词匹配 / 跳回）
+  'studystate.test.mjs',  // 学习状态：剪贴板解析 / 掌握度 / 对应课程
   'course.test.mjs',      // 课程目录：合集/多P/单集、进度、继续上次
   'season.test.mjs',      // 课程选择性导出：只拼勾中的集
   'concepts.test.mjs',    // 概念抽取：切块 / 只认句子 id / 跨集合并
