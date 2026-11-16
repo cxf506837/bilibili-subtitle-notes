@@ -311,3 +311,20 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 - 概念只从**这次勾选的集**里抽，且按 bnc:<cid> 缓存（键里带句子数与首末句 id，字幕变了就重抽）。同一批集反复导出不会重复花钱。
 - 抽概念是唯一需要 Key 的步骤；没填 Key 时仍能导出字幕，只是学习包里没有概念，状态条会说明。
 - 成本按 2 集约 5.5k token 线性推：9 集约 1 万 token 级、约 ¥0.02。真正贵的是「整片字幕都喂一遍」，所以先用闸门把不可信的字幕挡在外面，也是在省这笔钱。
+
+## 十五、换视频时旧回包串进新视频（2026-11-16 真机 before/after）
+
+现象：一个视频整理到一半，点右侧推荐换片，新视频里冒出一条上一个视频的笔记，刷新还在。
+
+机制（代码证据）：`runQueue` 里 `const res = await callWithRetry(...)` 之后无条件 `state.notes.push(note)` + `save()`。回包期间 `boot()` 已经把 `state.notes` 清空、`state.bvid / state.meta` 换成新视频 ⇒ 旧笔记被写进新视频的 IndexedDB（键 `bvid:cid`）和检索索引 `bnidx:<bvid>:<cid>`。同类没守卫的点还有 `checkReadability`（会把旧视频的字幕缓存成新视频的 `sub|<bvid>:<cid>`）、`hydrateNotes`、`generateSection`、`maybeSections`、`saveNow`（meta 还没解析时写出 `BVxxx:` 这种半截键）。
+
+修法：`boot()` 里每次 `const seq = ++bootSeq`；每个 `await` 之后先比 `seq !== bootSeq`，不一致就整个丢弃。
+
+| 同一流程（BV1L7xm64EHP 点「总结这段」→ 200ms 内点推荐卡片跳到 BV1REx46NEc4；真 Edge 157 + 真 Key + 真模型） | 结果 |
+| --- | --- |
+| 未加守卫（HEAD 0cf052a） | 日志 `{"kind":"res","reqBvid":"BV1L7xm64EHP","nowBvid":"BV1REx46NEc4","t":0}` 紧接 `{"kind":"push","t":0,"nowBvid":"BV1REx46NEc4"}`；新视频笔记数 0 → 1（另 1 条是新视频自己的） |
+| 加守卫后 | 日志 `{"kind":"res",...,"same":false}` 紧接 `{"kind":"stale-abort",...}`，没有 push；15 秒采样期内新视频笔记数不变 |
+
+为什么必须用点推荐卡片：B站 是 pjax 站内导航（同一 document，前后 `window.__mixMark` 都是 777）。整页 navigate 会销毁文档，旧回包根本回不来，也就测不出这个 bug。
+
+> 诚实记录：这次只防「以后不再串」。已经被写脏的库（旧视频笔记躺在另一个视频下面）不会自动认出来——那需要人工删。

@@ -802,6 +802,7 @@
   // 本地特征先给一个结论（免费、立刻）；再花一次约 300 token 的模型调用确认。
   // 模型说不是机翻，就把本地的 machine 降成 suspect——别硬冤枉正常字幕。
   async function checkReadability() {
+    const seq = bootSeq;
     const local = G.readability(state.sentences);
     let verdict = local.verdict;
     let source = 'local';
@@ -819,6 +820,8 @@
         }
       }
     }
+    // 这次判定是给哪条字幕做的：模型回包期间换了视频就作废，别把结论/缓存写到新视频头上
+    if (seq !== bootSeq) return;
     state.readability = { verdict, source, flags: local.flags, note };
     renderReadability();
     if (state.meta && state.sentences.length) {
@@ -1577,6 +1580,7 @@
 
   function saveNow() {
     if (!state.bvid) return;
+    if (!state.meta || !state.meta.cid) return; // meta 还没解析出来：别写 "BVxxx:" 这种半截键
     dbPut(state.bvid + ':' + (state.meta ? state.meta.cid : ''), {
       verdict: state.verdict, notes: state.notes, tokens: state.tokens,
       sections: state.sections, savedAt: Date.now(),
@@ -1615,8 +1619,11 @@
 
   // 冷启动：把上一次这个视频的笔记从 IndexedDB 捞回来（字幕也走缓存时才会命中）
   async function hydrateNotes() {
+    const seq = bootSeq;
     const key = state.bvid + ':' + (state.meta ? state.meta.cid : '');
     const saved = await dbGet(key);
+    // 读 IndexedDB 期间换了视频：这批笔记属于上一个视频
+    if (seq !== bootSeq) return 0;
     if (!saved || !saved.notes || !saved.notes.length) return 0;
     linkNotes(saved.notes);
     if (Array.isArray(saved.sections) && saved.sections.length) {
@@ -2012,6 +2019,7 @@
   const SEC = { BLOCKS: 8 };
 
   async function generateSection(g, lo, hi, items) {
+    const seq = bootSeq;
     state.sectionBusy = true;
     try {
       const bs = state.blocks.slice(lo, hi);
@@ -2021,6 +2029,7 @@
         items.map(function (n) { return { oneThing: n.oneThing, summary: n.blockSummary }; }),
         fmt(from), fmt(to));
       const res = await callWithRetry(payload);
+      if (seq !== bootSeq) return;
       if (!res.ok) { state.sectionDbg = { g: g, error: res.error || 'call-failed' }; return; }
       addCost(res.usage);
       const v = S.validateSection(res.content);
@@ -2060,7 +2069,9 @@
         items.push(n);
       }
       state.sectionTry[g] = tries + 1;
+      const seq = bootSeq;
       generateSection(g, lo, hi, items).then(function () {
+        if (seq !== bootSeq) return; // 已经换视频了，别把标记打到新视频上
         // 成功才封口；失败留着重试（最多 3 次）
         if ((state.sections || []).some(function (s) { return s.idx === g; })) state.sectionTried[g] = true;
       }).catch(function () {});
@@ -2074,7 +2085,12 @@
     // 那会在后台一直发请求又不成功。等用户自己点一下再继续。
     if (state.queueHold) return;
     state.busy = true;
+    const seq = bootSeq;
+    // 换视频后这个循环必须立刻退场：旧视频的回包要是被 push 进新视频的 notes，
+    // 再顺着 save() 落盘，就是用户看到的「两份笔记混在一起」。
+    const stale = function () { return seq !== bootSeq; };
     while (state.queue.length) {
+      if (stale()) { state.busy = false; return; }
       const block = state.queue.shift();
       const lines = S.toPromptLines(block, state.sentences);
       const prev = state.notes.length ? state.notes[state.notes.length - 1].oneThing : '';
@@ -2084,10 +2100,12 @@
       if (state.visual.enabled && grabber && !(block.visual && block.visual.length) && DEIXIS.test(String(block.text || ''))) {
         grabber.force('deixis');
         await new Promise(function (r) { setTimeout(r, 2200); });
+        if (stale()) { state.busy = false; return; }
       }
       const machine = state.readability.verdict === 'machine';
       const maxPoints = machine ? 2 : 4;
       const res = await callWithRetry(S.promptFor(lines, prev, block.visual, { machine, maxPoints }));
+      if (stale()) { state.busy = false; return; }
       if (!res.ok) {
         // 重试用尽：把这块放回队首，别静默吞掉（用户点「再试一次」或稍后自动继续都能补上）
         state.queue.unshift(block);
