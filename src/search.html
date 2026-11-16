@@ -11,6 +11,11 @@
   <div class="sub" id="scope">在你的 B站 笔记里搜</div>
   <div class="slogan">把 B站 视频变成能带走的笔记</div>
 </header>
+<div class="pack" id="pack" hidden>
+  <div class="ph"><span class="pt">学习包已导出</span><span class="pm" id="packMeta"></span></div>
+  <div class="pr"><button class="btn primary" id="packCopy">复制给 agent 的话</button><button class="btn" id="packClose">关闭</button></div>
+  <div class="pn" id="packNote"></div>
+</div>
 <div class="courses" id="courses" hidden>
   <div class="chd"><span class="cht">接着学</span><span class="chm" id="coursesMeta"></span></div>
   <div class="crows" id="courseRows"></div>
@@ -42,6 +47,7 @@
 <script src="searchindex.js"></script>
 <script src="studystate.js"></script>
 <script src="coursestore.js"></script>
+<script src="packhandoff.js"></script>
 <script src="search.js"></script>
 </body>
 </html>

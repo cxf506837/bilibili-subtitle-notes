@@ -1028,3 +1028,10 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 3. **掌握度只读不判**：徽标完全来自 agent 回流的 `study-state`，插件自己不猜。
 
 真机（BV1BgH36DE7y，9 集 S2 缓存）：103 概念 / 9 组 / 215 锚点 / 跨集 2 / 标灰 29；写入真实 study-state 后 16 个徽标热更新；点原话 2.9s→62.8s 同页 seek。测试 720 条（新增 `conceptview.test.mjs` 34 条）。详见 docs/evidence.md 第三十节。
+
+## 2026-11-16 学习包交接（v1.4.19）
+
+- 问题：导出到浏览器下载目录之后，agent 不知道文件在哪；改名/换机器/改下载路径就断。
+- 取向：不加 `downloads` 权限、不加本地程序。导出后把一句「读哪个文件、找不到就问我路径、先确认 spec」写进剪贴板，并在 `chrome.storage.local` 的 `bn.packLast` 存一条，弹窗顶部给「复制给 agent 的话」卡片（`copiedAt` 为空时自动补一次）。
+- 真 bug：无焦点页面里 `navigator.clipboard.writeText()` 的 Promise 永不 settle（不 reject）⇒ 状态条卡在「抽概念 N/N」、记录不落盘。修法：先写 storage 再试剪贴板，并用 `Promise.race` 加 1.5s 超时。
+- 真机：S2 前两集导出 23 秒完成，状态「学习包已导出 · 2 集 · 9 条笔记 · 24 个概念 / 55 个时间锚点」，`bn.packLast` 有 jsonName/mdName/text。

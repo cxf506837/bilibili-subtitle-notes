@@ -4,6 +4,7 @@
 (function () {
   'use strict';
   const B = window.BnIndex;
+  const HO = window.BnPackHandoff;
   const q = document.getElementById('q');
   const list = document.getElementById('list');
   const meta = document.getElementById('meta');
@@ -105,6 +106,55 @@
   }
 
 
+  // ---- 学习包：导出后把「读哪个文件、找不到问谁」这句话一键放进剪贴板 ----
+  // 扩展拿不到绝对路径，所以话里写「找不到就问我路径」，而不是编一个路径。
+  const packEl = document.getElementById('pack');
+  const packMeta = document.getElementById('packMeta');
+  const packCopy = document.getElementById('packCopy');
+  const packClose = document.getElementById('packClose');
+  const packNote = document.getElementById('packNote');
+  let pendingPack = null;
+
+  function copyPack() {
+    if (!pendingPack) return;
+    const done = function () {
+      pendingPack = HO.markedCopied(pendingPack, new Date().toISOString());
+      const obj = {};
+      obj[HO.KEY] = pendingPack;
+      chrome.storage.local.set(obj);
+      packCopy.textContent = '再复制一次';
+      packNote.innerHTML = '已复制。去 agent 里粘一下就开讲。文件在浏览器下载目录（Windows 是「下载」文件夹），找不到它会问你路径。';
+    };
+    const fail = function () {
+      packCopy.textContent = '复制给 agent 的话';
+      packNote.innerHTML = '没能写进剪贴板。点上面的按钮再试一次。';
+    };
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return fail();
+      navigator.clipboard.writeText(pendingPack.text).then(done, fail);
+    } catch (e) { fail(); }
+  }
+
+  function renderPack(all) {
+    if (!HO) { packEl.hidden = true; return; }
+    const rec = HO.parsePending(all[HO.KEY]);
+    if (!rec) { packEl.hidden = true; return; }
+    pendingPack = rec;
+    packMeta.textContent = rec.jsonName + (rec.episodes ? ' · ' + rec.episodes + ' 集' : '');
+    packMeta.title = rec.jsonName;
+    packEl.hidden = false;
+    if (!HO.shouldAutoCopy(rec)) {
+      packCopy.textContent = '再复制一次';
+      packNote.innerHTML = '这个包已经复制过了：去 agent 里粘一下（Ctrl+V）就行。';
+      return;
+    }
+    packCopy.textContent = '复制给 agent 的话';
+    packNote.innerHTML = '正在把这句放进剪贴板…';
+    copyPack();
+  }
+
+  packCopy.addEventListener('click', copyPack);
+  packClose.addEventListener('click', function () { packEl.hidden = true; });
   // ---- 接着学：把看过的课程列出来，一键回到上次那一集那一秒 ----
   const CS = window.BnCourseStore;
   const coursesEl = document.getElementById('courses');
@@ -299,6 +349,7 @@
 
   chrome.storage.local.get(null, function (all) {
     entries = B.fromStorage(all);
+    renderPack(all);
     renderCourses(all);
     renderRecent();
     renderCurrent();

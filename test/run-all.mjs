@@ -26,6 +26,7 @@ const FILES = [
   'concepts.test.mjs',    // 概念抽取：切块 / 只认句子 id / 跨集合并
   'conceptview.test.mjs', // 概念视图：跨集合并 / 去噪标记 / 按集分组 / 掌握度
   'study.test.mjs',       // 学习包：JSON 结构 + Markdown 版面
+  'packhandoff.test.mjs', // 交给 agent 的那句话：文件名 / 找不到就问 / spec 校验
   'studyplan.test.mjs',   // agent 侧：裁剪 / 救回 / 图 / 掌握度状态机
   'realdata.test.mjs',    // 60 条真实样本回归
 ];

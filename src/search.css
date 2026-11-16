@@ -86,6 +86,16 @@ body {
 .study .sn { font-size: 11px; color: #9499a0; line-height: 1.5; margin-top: 6px; }
 .study .sn b { color: #18191c; font-weight: 600; }
 
+/* 学习包：导出之后把「读哪个文件」这句话一键放进剪贴板 */
+.pack { margin: 8px 12px 0; border: 1px solid #00aeec; border-radius: 6px; background: #f2fbfe; padding: 9px 10px; }
+.pack[hidden] { display: none; }
+.pack .ph { display: flex; align-items: baseline; gap: 8px; }
+.pack .pt { font-size: 12px; font-weight: 600; color: #18191c; flex: 0 0 auto; }
+.pack .pm { font-size: 11px; color: #0091c5; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.pack .pr { display: flex; gap: 6px; margin-top: 7px; }
+.pack .pr .btn { flex: 0 0 auto; }
+.pack .pn { font-size: 11px; color: #9499a0; line-height: 1.5; margin-top: 6px; }
+.pack .pn b { color: #18191c; font-weight: 600; }
 /* 接着学：点图标就能回到上次那门课的那一集 */
 .courses { padding: 8px 14px 6px; border-bottom: 1px solid #e3e5e7; background: #fff; }
 .courses[hidden] { display: none; }

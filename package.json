@@ -1,6 +1,6 @@
 {
   "name": "bili-notes",
-  "version": "1.4.18",
+  "version": "1.4.19",
   "description": "B站字幕笔记：先把字幕验成这个视频的，再整理成可核对、能点回原句的笔记",
   "private": true,
   "license": "MIT",

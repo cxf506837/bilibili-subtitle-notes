@@ -853,9 +853,48 @@
       setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 600);
       const n = pack.doc.counts;
       const conceptMsg = n.concepts ? (n.concepts + ' 个概念 / ' + n.anchors + ' 个时间锚点') : '没抽概念';
+      // 交给 agent 的最后一厘米：浏览器只肯把文件下到下载目录，扩展也拿不到绝对路径。
+      // 所以这里把「读哪个文件、找不到怎么办、先校验 spec」写成一句可直接粘的话，放进剪贴板。
+      const HO = window.BnPackHandoff || null;
+      let packCopied = false;
+      let packTip = 'JSON 给 agent，Markdown 自己看；格式见 docs/agent-integration.md';
+      if (HO) {
+        const goalNow = await studyGoal();
+        const handText = HO.text({
+          baseName: pack.baseName,
+          course: (m.title || ''),
+          scope: scope,
+          episodes: good.length,
+          goal: goalNow,
+        });
+        const rec = HO.record({
+          baseName: pack.baseName, course: (m.title || ''), scope: scope,
+          episodes: good.length, goal: goalNow, text: handText,
+        });
+        // 先把记录写进去：剪贴板写失败也不该让「学习包已导出」这张卡丢掉。
+        try { const obj = {}; obj[HO.KEY] = rec; chrome.storage.local.set(obj); } catch (e) {}
+        // 无焦点的页面里 navigator.clipboard.writeText 的 Promise 可能永远不 settle（不是 reject），
+        // 之前 await 它就卡在这里：状态条停在「抽概念 N/N」，卡片也永远不出现。必须带超时。
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            const okCp = await Promise.race([
+              navigator.clipboard.writeText(handText).then(function () { return true; }, function () { return false; }),
+              new Promise(function (res) { setTimeout(function () { res(false); }, 1500); }),
+            ]);
+            if (okCp) {
+              packCopied = true;
+              rec.copiedAt = new Date().toISOString();
+              try { const obj2 = {}; obj2[HO.KEY] = rec; chrome.storage.local.set(obj2); } catch (e) {}
+            }
+          }
+        } catch (e) { packCopied = false; }
+        packTip = packCopied
+          ? '交给 agent 的那句话已复制：去 agent 里粘一下'
+          : '点扩展图标，可一键复制「交给 agent 的话」';
+      }
       setStatus(bad.length ? 'warn' : 'ok',
         '学习包已导出 · ' + n.episodes + ' 集 · ' + n.notes + ' 条笔记 · ' + conceptMsg,
-        bad.length ? '没导出的集写在包末尾' : 'JSON 给 agent，Markdown 自己看；格式见 docs/agent-integration.md');
+        bad.length ? '没导出的集写在包末尾' : packTip);
     } finally {
       state.batch.running = false;
     }
