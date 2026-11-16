@@ -167,6 +167,27 @@
     return { count: list.length, eps: eps.length, list: list };
   }
 
+  // 中栏的两个视角（纯函数，方便在 node 里测）：
+  //   unwatched —— 只看还没看过的集（接着学的时候少滚一点）
+  //   cross     —— 只看跨集概念（它们才是「知识点之间的连接」）
+  function filterByView(groups, mode, watchedEps) {
+    const arr = Array.isArray(groups) ? groups : [];
+    const w = {};
+    (Array.isArray(watchedEps) ? watchedEps : []).forEach(function (e) { if (e != null) w[Number(e)] = 1; });
+    if (mode === 'unwatched') {
+      return arr.filter(function (g) { return !w[Number(g && g.ep)]; });
+    }
+    if (mode === 'cross') {
+      const out = [];
+      arr.forEach(function (g) {
+        const items = ((g && g.items) || []).filter(function (it) { return it && it.cross; });
+        if (items.length) out.push({ ep: g.ep, label: g.label, title: g.title, items: items });
+      });
+      return out;
+    }
+    return arr.slice();
+  }
+
   function tokens(q) {
     return str(q).toLowerCase().split(/\s+/).filter(Boolean);
   }
@@ -192,6 +213,6 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
+    filterGroups: filterGroups, filterByView: filterByView, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });

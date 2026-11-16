@@ -124,5 +124,21 @@ ok('没有 bvid 就没有地址', P.playerSrc({ cid: '1' }, 5) === '');
 ok('null 安全', P.playerSrc(null, 5) === '');
 ok('域名固定 player.bilibili.com', src1.indexOf('https://player.bilibili.com/player.html?') === 0);
 
+// —— 中栏视角：只看没看过的集 / 只看跨集概念 ——
+const gA = { ep: 1, label: 'S1-0', items: [{ concept: 'a', cross: true }, { concept: 'b' }] };
+const gB = { ep: 2, label: 'S1-1', items: [{ concept: 'c' }] };
+const gC = { ep: 3, label: 'S1-2', items: [{ concept: 'd', cross: true }] };
+const all3 = [gA, gB, gC];
+ok('all 原样返回', P.filterByView(all3, 'all', [1]).length === 3);
+ok('unwatched 去掉看过的集', P.filterByView(all3, 'unwatched', [1]).map(function (g) { return g.ep; }).join(',') === '2,3');
+ok('unwatched 全看过就是空', P.filterByView(all3, 'unwatched', [1, 2, 3]).length === 0);
+ok('watchedEps 传字符串也能比', P.filterByView(all3, 'unwatched', ['1']).length === 2);
+const crossOnly = P.filterByView(all3, 'cross', []);
+ok('cross 只留跨集概念', crossOnly.length === 2 && crossOnly[0].items.length === 1 && crossOnly[1].items[0].concept === 'd');
+ok('cross 把只看过一集的概念整组丢掉', crossOnly.some(function (g) { return g.ep === 2; }) === false);
+ok('cross 不改原数组', all3[0].items.length === 2);
+ok('空输入安全', P.filterByView(null, 'cross', null).length === 0 && P.filterByView([], 'unwatched', null).length === 0);
+ok('未知视角当 all', P.filterByView(all3, 'x', [1]).length === 3);
+
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

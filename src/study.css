@@ -41,6 +41,14 @@ h2:first-child { margin-top:0; }
 .eps li.now .t { color:var(--accent); font-weight:600; }
 .eps li .n { color:var(--sub); font-size:11px; flex:none; }
 
+/* 中栏视角切换：全部 / 没看过 / 跨集 */
+.filters { display:flex; gap:4px; margin:10px 0 2px; }
+.fbtn { flex:1; border:1px solid var(--line); background:#fff; border-radius:6px; padding:3px 0; font:inherit; font-size:12px; color:#41464d; cursor:pointer; }
+.fbtn:hover { border-color:var(--accent); color:var(--accent); }
+.fbtn.on { border-color:#bfe9fb; background:#f2fbfe; color:var(--accent); font-weight:600; }
+.vnote { font-size:12px; color:var(--sub); margin:0 0 8px; }
+.vnote b { color:var(--fg); }
+
 .ghead { display:flex; align-items:baseline; gap:8px; margin:18px 0 8px; }
 .ghead .lbl { font-weight:600; }
 .ghead .t { color:var(--sub); font-size:13px; }

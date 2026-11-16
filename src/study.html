@@ -19,6 +19,11 @@
   <aside class="rail">
     <h2>这门课</h2>
     <div id="overview" class="overview"></div>
+    <div class="filters" role="group" aria-label="看哪些">
+      <button class="fbtn on" type="button" data-view="all" aria-pressed="true">全部</button>
+      <button class="fbtn" type="button" data-view="unwatched" aria-pressed="false">没看过</button>
+      <button class="fbtn" type="button" data-view="cross" aria-pressed="false" title="只看跨集出现的概念——它们才是知识点之间的连接">跨集</button>
+    </div>
     <h2>每集</h2>
     <ol id="eps" class="eps"></ol>
   </aside>
@@ -33,6 +38,7 @@
       </div>
       <div id="pframe" class="pframe"></div>
     </div>
+    <div id="viewNote" class="vnote" hidden></div>
     <div id="empty" class="empty" hidden></div>
     <div id="groups"></div>
   </section>

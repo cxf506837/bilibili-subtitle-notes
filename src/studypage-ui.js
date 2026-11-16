@@ -17,6 +17,7 @@
   let courseId = '';
   let q = '';
   let EPMAP = {};   // 集号 -> 课程里的那一集（bvid / cid / page / title）
+  let view = 'all';   // 中栏视角：all | unwatched | cross
 
   function statusMap(all, id) {
     const raw = all['bnstudy:' + String(id)];
@@ -154,6 +155,34 @@
     });
   }
 
+  // 这门课里「看过的集号」列表（进度按 cid 存，这里换成集号给 filterByView 用）
+  function watchedIdx(course) {
+    const pm = P.progressMap(ALL);
+    const out = [];
+    ((course && course.episodes) || []).forEach(function (e) {
+      if (e && P.watched(e, pm)) out.push(Number(e.index));
+    });
+    return out;
+  }
+
+  // 中栏顶上那行小字：现在看的是哪个视角、还剩多少个。
+  function renderNote(course, filtered, shown, totals) {
+    const box = $('viewNote');
+    if (!box) return;
+    if (view === 'all' && !q) { box.hidden = true; box.textContent = ''; return; }
+    const n = shown.reduce(function (a, g) { return a + ((g && g.items) || []).length; }, 0);
+    const parts = [];
+    if (view === 'unwatched') {
+      const all = ((course && course.episodes) || []).length;
+      parts.push('只看<b>没看过</b>的集：' + shown.length + ' / ' + all + ' 集');
+    } else if (view === 'cross') {
+      parts.push('只看<b>跨集</b>概念：' + n + ' 个（全课 ' + ((totals && totals.cross) || 0) + ' 个跨集）');
+    }
+    if (q) parts.push('搜索「' + q + '」命中 ' + n + ' 个概念' + (view !== 'all' ? '' : '，分布在 ' + shown.length + ' 集'));
+    box.hidden = !parts.length;
+    box.innerHTML = parts.join(' · ');
+  }
+
   function renderGroups(course) {
     const box = $('groups');
     const empty = $('empty');
@@ -179,12 +208,18 @@
       titles: titles,
       mastery: statusMap(ALL, course && course.id),
     });
-    const shown = P.filterGroups(grouped.groups, q);
+    const filtered = P.filterGroups(grouped.groups, q);
+    const shown = P.filterByView(filtered, view, watchedIdx(course));
+    renderNote(course, filtered, shown, grouped.totals);
     if (!shown.length) {
       empty.hidden = false;
-      empty.innerHTML = '<b>没有命中</b>换个词试试：概念名、定义里的词、原话里的句子都算。';
+      if (q) empty.innerHTML = '<b>没有命中</b>换个词试试：概念名、定义里的词、原话里的句子都算。';
+      else if (view === 'unwatched') empty.innerHTML = '<b>没有没看过的集了</b>这门课已经全部看过；点「全部」可以回看讲过的概念。';
+      else if (view === 'cross') empty.innerHTML = '<b>还没有跨集概念</b>现在的概念都只在一集里出现；多抽几集，跨集连接就会出来。';
+      else empty.innerHTML = '<b>还没有概念</b>去视频页面板里点「概念」。';
       return;
     }
+    empty.hidden = true;   // 上一次搜索的「没有命中」不能留在屏幕上
     shown.forEach(function (grp) {
       const head = el('div', 'ghead');
       head.appendChild(el('span', 'lbl', grp.label || ('第 ' + grp.ep + ' 集')));
@@ -312,6 +347,19 @@
     $('q').value = '';
     render();
   });
+  document.querySelectorAll('.fbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      view = b.getAttribute('data-view') || 'all';
+      document.querySelectorAll('.fbtn').forEach(function (x) {
+        const on = x === b;
+        x.classList.toggle('on', on);
+        x.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      const course = P.pick(P.courses(ALL), courseId);
+      if (course) renderGroups(course);
+    });
+  });
+
   const pc = $('pclose');
   if (pc) pc.addEventListener('click', closePlayer);
   $('q').addEventListener('input', function (e) {
