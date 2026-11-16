@@ -168,5 +168,13 @@ ok('带出集标签与秒数', rqOne[0].ep === 3 && rqOne[0].t === 75 && rqOne[0
 const rqNoLabel = P.reviewQueue([card('无标签', { anchors: [{ ep: 7, t: 5 }] })]);
 ok('缺集标签兜底「第 N 集」', rqNoLabel[0].epLabel === '第 7 集');
 
+// 视角参数：URL 里写错不能把页面带进「按钮写全部、内容空着」的矛盾状态。
+ok('view=all', P.parseView('all') === 'all');
+ok('view=unwatched', P.parseView('unwatched') === 'unwatched');
+ok('view=cross', P.parseView('cross') === 'cross');
+ok('没传 view 就是 all', P.parseView(null) === 'all' && P.parseView(undefined) === 'all' && P.parseView('') === 'all');
+ok('乱写的 view 退回 all', P.parseView('CROSS') === 'all' && P.parseView('bogus') === 'all' && P.parseView('../../x') === 'all');
+ok('带空格也认', P.parseView(' cross ') === 'cross');
+
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

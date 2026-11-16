@@ -1,6 +1,9 @@
 // 后台：唯一能绕过 CORS 抓 aisubtitle 的地方，也是唯一调 LLM 的地方。
 'use strict';
 
+// 学习页 URL 的拼法在 src/studylink.js（纯函数，单测在 test/studylink.test.mjs）。
+try { importScripts('studylink.js'); } catch (e) {}
+
 function fnv1a(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -197,7 +200,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'openStudy') {
     // 面板里点「学习页」：内容脚本没有 chrome.tabs，只能让后台开一个扩展页。
     const cid = String((msg && msg.courseId) || '');
-    const url = chrome.runtime.getURL('src/study.html') + (cid ? '?course=' + encodeURIComponent(cid) : '');
+    const base = chrome.runtime.getURL('src/study.html');
+    const url = (typeof BnStudyLink !== 'undefined' && BnStudyLink)
+      ? BnStudyLink.studyUrl(base, cid, msg && msg.view)
+      : base + (cid ? '?course=' + encodeURIComponent(cid) : '');
     try { chrome.tabs.create({ url: url }); } catch (e) {}
     sendResponse({ ok: true });
     return true;

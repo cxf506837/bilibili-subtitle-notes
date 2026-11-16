@@ -28,6 +28,7 @@ const FILES = [
   'study.test.mjs',       // 学习包：JSON 结构 + Markdown 版面
   'packhandoff.test.mjs', // 交给 agent 的那句话：文件名 / 找不到就问 / spec 校验
   'studypage.test.mjs', // 学习页：挑课程 / 进度 / 掌握度 / 笔记数 / 按词过滤概念
+  'studylink.test.mjs', // 学习页链接：课程 id + 视角 → 扩展页 URL
   'studyplan.test.mjs',   // agent 侧：裁剪 / 救回 / 图 / 掌握度状态机
   'realdata.test.mjs',    // 60 条真实样本回归
 ];

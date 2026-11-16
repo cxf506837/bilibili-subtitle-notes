@@ -203,6 +203,13 @@
     return { count: list.length, eps: eps.length, list: list };
   }
 
+  // 视角参数（?view=...）→ 三档之一。URL 里写错 / 写成别的值一律退回 all，
+  // 免得「按钮写着全部、内容却空着」这种自相矛盾的状态出现在用户眼前。
+  function parseView(v) {
+    const s = String(v == null ? '' : v).trim();
+    return (s === 'unwatched' || s === 'cross') ? s : 'all';
+  }
+
   // 中栏的两个视角（纯函数，方便在 node 里测）：
   //   unwatched —— 只看还没看过的集（接着学的时候少滚一点）
   //   cross     —— 只看跨集概念（它们才是「知识点之间的连接」）
@@ -249,6 +256,6 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups, filterByView: filterByView, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
+    filterGroups: filterGroups, filterByView: filterByView, parseView: parseView, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });

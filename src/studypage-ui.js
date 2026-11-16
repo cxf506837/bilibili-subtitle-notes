@@ -389,6 +389,14 @@
 
   const params = new URLSearchParams(location.search);
   courseId = params.get('course') || '';
+  // 面板课程头的「跨集 N」用 ?view=cross 直接把学习页开在这一档；三档按钮的选中态也据此设，
+  // 否则会「按钮写全部、内容却是跨集」——两处不一致比不做还糟。
+  view = P.parseView(params.get('view'));
+  document.querySelectorAll('.fbtn').forEach(function (x) {
+    const on = (x.getAttribute('data-view') || 'all') === view;
+    x.classList.toggle('on', on);
+    x.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
 
   $('courseSel').addEventListener('change', function (e) {
     courseId = e.target.value;

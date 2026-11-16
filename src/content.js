@@ -223,6 +223,8 @@
   '.chd .cm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
   '.chd .cm { font-size: 11px; color: var(--bnmuted); font-variant-numeric: tabular-nums; }',
   '.chd .next { flex: 0 0 auto; }',
+  '.chd .cx2 { flex: 0 0 auto; font-size: 11px; color: var(--bnaccent); border: 1px solid #bfe9fb; background: #f2fbfe; border-radius: 4px; padding: 0 4px; line-height: 16px; cursor: pointer; }',
+  '.chd .cx2:hover { border-color: var(--bnaccent); text-decoration: none; }',
   '.chd .cx { flex: 0 0 auto; font-size: 11px; color: var(--bnmuted); }',
   '.chd .cx.open { transform: rotate(180deg); }',
   '.clist { display: none; max-height: 210px; overflow-y: auto; border-top: 1px solid var(--bnline); }',
@@ -321,6 +323,7 @@
     '</div>',
     '<div class="c2">',
     '<span class="cm" id="courseMeta"></span>',
+    '<span class="cx2 hidden" id="courseCross" title="有跨集出现的概念——知识点之间的连接"></span>',
     '<button class="btn sm next hidden" id="courseNext" title="跳到下一集没看过的">继续</button>',
     '</div>',
     '</div>',
@@ -1223,10 +1226,22 @@
       conceptListEl.appendChild(d);
     }
   }
+  // 课程头上的「跨集 N」：conceptData 是 refreshConcepts 刚算好的，直接数 totals.cross，不再读一次 storage。
+  // 它回答的是「这门课里有哪些点是跨集串起来的」——这正是这门课值不值得用学习页的原因。
+  function syncCrossBadge() {
+    const el = $('courseCross');
+    if (!el) return;
+    const n = (courseModel && conceptData && conceptData.totals) ? Number(conceptData.totals.cross) || 0 : 0;
+    if (!n) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.textContent = '跨集 ' + n;
+    el.title = '有 ' + n + ' 个概念在两集以上出现——它们是知识点之间的连接。点一下，学习页只看这些';
+  }
+
   function refreshConcepts() {
-    if (!window.BnConceptView || !window.BnConcept) return;
+    if (!window.BnConceptView || !window.BnConcept) { syncCrossBadge(); return; }
     const cids = conceptCids();
-    if (!cids.length) { conceptData = null; renderConcepts(); return; }
+    if (!cids.length) { conceptData = null; renderConcepts(); syncCrossBadge(); return; }
     try {
       chrome.storage.local.get(null, function (all) {
         conceptData = window.BnConceptView.group(window.BnConceptView.collect(all, cids), {
@@ -1236,8 +1251,9 @@
           mastery: masteryMap(),
         });
         renderConcepts();
+        syncCrossBadge();
       });
-    } catch (e) { conceptData = null; renderConcepts(); }
+    } catch (e) { conceptData = null; renderConcepts(); syncCrossBadge(); }
   }
   function jumpConceptAnchor(a) {
     if (!a) return;
@@ -3979,17 +3995,23 @@
   });
   document.addEventListener('click', function () { $('more').classList.remove('open'); });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') $('more').classList.remove('open'); });
-  $('btnStudy').addEventListener('click', openStudyPage);
+  $('btnStudy').addEventListener('click', function () { openStudyPage(''); });
+  const crossEl = $('courseCross');
+  if (crossEl) crossEl.addEventListener('click', function (ev) {
+    ev.stopPropagation();   // 课程头自己有个「点开清单」的点击，别让它也响应
+    openStudyPage('cross');
+  });
   $('btnDiag').addEventListener('click', copyDiag);
   $('btnVerify').addEventListener('click', function () { boot(true); });
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
   // 内容脚本里 chrome.runtime.openOptionsPage 是 undefined（2026-11-16 真机实测），只能让后台代开。
   // 之前那句 if (chrome.runtime.openOptionsPage) 永远不成立，面板「设置」按钮点了没反应。
   // 学习页：整门课一屏。内容脚本开不了扩展页，交给后台 chrome.tabs.create。
-  function openStudyPage() {
+  function openStudyPage(v) {
+    const view = (v === 'cross' || v === 'unwatched') ? v : '';
     try {
       if (chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'openStudy', courseId: courseModel ? courseModel.id : '' });
+        chrome.runtime.sendMessage({ type: 'openStudy', courseId: courseModel ? courseModel.id : '', view: view });
       }
     } catch (e) {}
   }

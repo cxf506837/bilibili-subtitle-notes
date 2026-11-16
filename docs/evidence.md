@@ -891,3 +891,46 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 - 概念一个都没有时整张卡 `hidden`，不留空壳。
 - 排序只在**这 6 个上**做决定，不改中栏的顺序（中栏永远是按集、按时间）。
 
+## 三十七、面板上直接进「跨集」视角（1.4.25）
+
+跨集视角（只看出现在两集以上的概念）1.4.23 就做出来了，但入口藏在学习页左栏——第一屏（B站 视频页右侧面板）根本看不见。这一版把它搬到面板课程条上。
+
+### 做了什么
+
+- 面板课程条多一枚小胶囊「跨集 44」，数字来自 `refreshConcepts()` 已经算好的 `conceptData.totals.cross`，不额外读 storage。
+- 点它 → 内容脚本发 `{type:'openStudy', courseId, view:'cross'}` → 后台拼 `src/study.html?course=…&view=cross` 开新标签 → 学习页读到 `?view=cross` 直接把中栏切到「跨集」。
+- URL 拼装单独抽成纯函数 `src/studylink.js` 的 `studyUrl(base, cid, view)`（14 条单测），后台 `importScripts` 之后用它；学习页的 `parseView()` 另有一份（6 条单测）。两边都只认 `cross` / `unwatched`。
+
+### 真机数字（真 Edge 157 + 真扩展 1.4.25，`season:8719249`）
+
+| # | 检查 | 实测 |
+| --- | --- | --- |
+| 1 | 面板课程条徽标 | `#courseCross` 的 `hidden=false`，文字 `跨集 44`，title 是「有 44 个概念在两集以上出现——它们是知识点之间的连接。点一下，学习页只看这些」 |
+| 2 | 点徽标发出的消息 | `{"t":"openStudy","cid":"season:8719249","view":"cross","keys":3}`（劫持 `chrome.runtime.sendMessage` 记录下来的，不是靠猜） |
+| 3 | 新标签 URL | `chrome-extension://<id>/src/study.html?course=season%3A8719249&view=cross` |
+| 4 | 学习页视角按钮 | `全部:false / 没看过:false / 跨集:true`，`aria-pressed=true` 同步 |
+| 5 | 视角说明 | 「只看跨集概念：44 个（全课 44 个跨集）」 |
+| 6 | 概念卡 | 44 张都带「跨 N 集」胶囊（跨 2/4/5 集不等），下面「出现在 2 集 · 6 处」这类按钮照旧 |
+| 7 | 左栏统计 | 70% 看过 · 12/25 集 · 还剩 55 分 5 秒 · 笔记 194 条 |
+| 8 | 控制台异常 | 0 |
+
+截图：`_lab\tour\130-study-cross-panel.png`（1300×1400 面板徽标见 `128-panel-cross.png`）。
+
+### 这一遍验收踩到的两件事（重要）
+
+1. **`dist\edge-profile` 这份测试 profile 后来坏了**：内容脚本完全不再注入（CDP 里只剩沉浸式翻译和 Bili SyncPlay 的隔离世界），存储目录 `Local Extension Settings\mdpphogn…` 也整个消失。同一个仓库、同一份 manifest，换一个**新建 profile** 立刻正常 ⇒ 判「扩展坏没坏」先换干净 profile，别在同一份 profile 里反复怀疑代码。
+2. **MV3 的 service worker 会缓存旧脚本**：改了 `src/background.js` 之后只重启浏览器（甚至 `chrome.runtime.reload()`）仍可能跑旧代码——用 `Debugger.getScriptSource` 抓到运行中的源码 10,882 字符、没有 `msg.view`，而磁盘上是 11,368 字符、含 `BnStudyLink`；同时 `chrome.runtime.getManifest().version` 却已经是新的 1.4.25。**版本号不能当「代码生效」的证据**，要看运行中脚本的字节数和特征串。
+
+### 端到端是怎么跑出来的（诚实交代）
+
+因为有上面第 1 条，最后一遍不是在被污染的老 profile 里跑，而是：新建空 profile → 从 `bili-notes-my` 加载扩展 → 把用户日常 Edge 里的 `chrome.storage.local`（187 个键：8 门课程存档、进度、掌握度）复制进来 → 再把 `Downloads\【从零开始的 AI 学习】（正片 · 25 集学习包）.json`（真实导出，230 个概念 / 296 段锚点）按 `bnc:<cid>` 的形状回填成概念缓存 → 重开 B站 视频页，走上面第 1–8 项。概念数字、进度、掌握度都是真实数据，不是 mock。
+
+### 为什么把拼 URL 抽成纯函数
+
+真机上参数拼错**没有报错**，只表现为「新页面没带 view、停在全部视角」，日志里什么都没有。抽成 `studyUrl(base, cid, view)` 之后，14 条断言能拦住这些：大写 `Cross`、`all`、`view=cross&x=1` 这种路径串、带空格的视角、`null`/`undefined` 课程、含 `:` 与 `#` 的课程 id。
+
+### 边界
+
+- 没有概念缓存时不显示徽标（`hidden`），不会留一个「跨集 0」的空壳。
+- 徽标点击自己 `stopPropagation()`，不会顺手触发课程条的「打开课程」行为。
+- `view` 不认识就当作「全部」，学习页不会因为一个脏参数白屏。
