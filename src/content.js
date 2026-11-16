@@ -9,7 +9,9 @@
 
   const state = {
     bvid: '', p: 1, meta: null, sentences: [], blocks: [], notes: [],
-    verdict: '', trackLan: '', status: 'init', detail: '' ,
+    verdict: '', trackLan: '', status: 'init', detail: '',
+    // 内容级提示：字幕正文与标题一个词都对不上（时长闸门挡不住「长度像但内容无关」）
+    titleCheck: null,
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, autoHidden: false, lastTime: 0,
     // 合集批量导出：running 防重入，cancel 让「停止导出」在下一 P 前生效
     batch: { running: false, cancel: false },
@@ -232,13 +234,14 @@
     '<span class="mono" id="cost"></span>',
     '</div>',
     '<div class="acts">',
-    '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▾</button>',
+    '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▸</button>',
     '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
     '<button class="btn hidden" id="btnMulti" title="这是合集 / 多 P：逐 P 取样并过闸门，把有字幕的那些拼成一份 Markdown。慢，会显示进度">导出全部 P</button>',
     '<button class="btn hidden" id="btnAll" title="把全片所有段落一次整理完">整理全片</button>',
     '<button class="btn hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
     '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">诊断</button>',
-    '<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
+    '<button class="btn sm hidden" id="btnVerify" title="这份字幕只取到过一份、没交叉核对：再取一次，两次一致才算核过">再取样</button>',
+'<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
     '<button class="btn accent" id="btnFold" title="收起右侧笔记面板">收起 ▸</button>',
     '<div class="foldonly foldbrand" id="foldBrand" title="展开右侧笔记面板">笔记</div>',
     '<div class="foldonly foldcount zero" id="foldCount" title="已生成的笔记条数">0</div>',
@@ -275,7 +278,7 @@
     '</div>',
     '<button class="btn sm awaymini hidden" id="awayMini">补课</button>',
     '<div class="vnote hidden" id="vnote"></div>',
-    '<div class="outline" id="outline"></div>',
+    '<div class="outline hidden" id="outline"></div>',
     '<div class="streamwrap">',
     '<div class="stream" id="stream"></div>',
     '<button class="btn jump hidden" id="jumpBtn" title="回到最新一条笔记">回到最新 ↓</button>',
@@ -990,6 +993,15 @@
       db.classList.remove('hidden');
       db.classList.toggle('accent', kind === 'warn' || kind === 'bad');
     }
+    syncVerifyBtn();
+  }
+
+  // 单次取样 = 只取到过一份、没交叉核对。用户实测遇到过「内容其实是另一个视频的」，
+  // 时长闸门拦不住这种；给一个显式的「再取样」，两次一致才算核过。
+  function syncVerifyBtn() {
+    const b = $('btnVerify');
+    if (!b) return;
+    b.classList.toggle('hidden', !(state.verdict === 'single' && !state.batch.running && !state.hard.active));
   }
 
   // 剪贴板：扩展页/内容脚本的权限模型不一样，先试 navigator.clipboard，失败退到 execCommand。
@@ -1033,6 +1045,7 @@
       page: Number(m.page) || 0,
       status: state.status,
       detail: state.detail,
+      titleOverlap: state.titleCheck ? (state.titleCheck.hits + '/' + state.titleCheck.tokens) : '',
       at: new Date().toISOString(),
     };
     return new Promise(function (resolve) {
@@ -1987,6 +2000,7 @@
   function hardSupported() { return !!HSUB && OCR_OK; }
 
   function syncHardBtn() {
+    syncVerifyBtn();
     const b = $('btnHard');
     if (!b) return;
     const usable = state.verdict !== 'stable' && state.verdict !== 'single';
@@ -2198,6 +2212,7 @@
     if (state.verdict === 'stable') base = src + ' · ' + (state.votes >= 3 ? state.votes + ' 次取样一致' : '两次取样一致');
     else if (state.verdict === 'single') base = src + ' · 单次取样（未复核）';
     if (state.readability.verdict === 'machine') base += ' · 疑似机翻';
+    if (state.titleCheck && state.titleCheck.tokens >= 6 && state.titleCheck.hits === 0) base += ' · 字幕和标题对不上';
     return base;
   }
 
@@ -2614,7 +2629,7 @@
   function snapshot() {
     return {
       meta: state.meta, sentences: state.sentences, blocks: state.blocks,
-      notes: state.notes, tokens: state.tokens, verdict: state.verdict, trackLan: state.trackLan,
+      notes: state.notes, tokens: state.tokens, verdict: state.verdict, trackLan: state.trackLan, titleCheck: state.titleCheck,
       covered: state.covered, readability: state.readability, sections: state.sections,
       away: { spans: state.away.spans, shown: state.away.shown },
     };
@@ -2638,6 +2653,7 @@
     state.tokens = snap.tokens;
     state.verdict = snap.verdict;
     state.trackLan = snap.trackLan;
+    state.titleCheck = snap.titleCheck || null;
     state.queue = [];
     state.queueHold = false;
     state.covered = snap.covered || [];
@@ -2694,6 +2710,7 @@
     state.queueHold = false;
     state.tokens = 0;
     state.verdict = '';
+    state.titleCheck = null;
     state.away.spans = [];
     state.away.last = null;
     state.away.catchup = null;
@@ -2738,6 +2755,7 @@
         state.trackLan = hit.trackLan || '';
         state.verdict = hit.verdict || 'single';
         state.readability = hit.readability || { verdict: '', source: '', flags: null, note: '' };
+        state.titleCheck = (state.meta && state.meta.title) ? G.titleOverlap(state.meta.title, state.sentences) : null;
         state.blocks = S.chunkSentences(state.sentences);
         renderReadability();
         if (!hit.readability) checkReadability();
@@ -2775,6 +2793,7 @@
     if (state.gateLog.length > 8) state.gateLog.shift();
     state.verdict = r.verdict;
     state.votes = r.votes || 0;
+    state.titleCheck = r.titleCheck || null;
     if (r.verdict === 'need-login') {
       setStatus('bad', '请先登录 B站', '未登录读不到字幕');
       renderEmpty('没登录 B站，所以读不到这个视频的字幕。<br><br>登录（右上角头像）→ 刷新本页，就会自动重新检查。' + (hardSupported()
@@ -2860,6 +2879,7 @@
     out.push('subtitle_source: ' + (state.trackLan || ''));
     if (state.verdict === 'hardsub' || state.trackLan === 'onscreen-ocr') out.push('subtitle_note: 画面字幕识别，可能有错字');
     out.push('verified: ' + (state.verdict === 'stable' ? 'two-samples-agree' : 'single-sample'));
+    if (state.titleCheck && state.titleCheck.tokens >= 6 && state.titleCheck.hits === 0) out.push('subtitle_title_overlap: 0/' + state.titleCheck.tokens + '（字幕和标题一个词都对不上，可能不属于这个视频）');
     // Obsidian 认 properties 里的 tags；多行写法不怕标题里的特殊字符。
     out.push('tags:');
     out.push('  - bilibili');
@@ -3234,11 +3254,16 @@
   $('awayIgnore').addEventListener('click', hideAway);
   $('awayX').addEventListener('click', hideAway);
   $('awayMini').addEventListener('click', function () { openCatchup(state.away.last); });
-  $('btnOutline').addEventListener('click', function () { outline.classList.toggle('hidden'); });
+  // 默认折叠：小节一生成就把笔记在流上方再列一遍，看起来像重复内容（用户实测反馈）
+  $('btnOutline').addEventListener('click', function () {
+    const hid = outline.classList.toggle('hidden');
+    this.textContent = hid ? '大纲 ▸' : '大纲 ▾';
+  });
   $('btnExport').addEventListener('click', exportMarkdown);
   $('btnMulti').addEventListener('click', exportAllParts);
   $('btnAll').addEventListener('click', function () { if (state.allRun) stopAll(); else startAll(); });
   $('btnDiag').addEventListener('click', copyDiag);
+  $('btnVerify').addEventListener('click', function () { boot(true); });
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
   $('btnOpt').addEventListener('click', function () {
     if (chrome.runtime && chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();

@@ -3,7 +3,7 @@ import { createContext, runInContext } from 'node:vm';
 
 const gateSrc = readFileSync(new URL('../src/gate.js', import.meta.url), 'utf8');
 const sumSrc = readFileSync(new URL('../src/summarize.js', import.meta.url), 'utf8');
-const ctx = createContext({ console, setTimeout, clearTimeout, AbortController, AbortSignal });
+const ctx = createContext({ console, setTimeout, clearTimeout, AbortController, AbortSignal, fetch: (...a) => globalThis.__testFetch(...a) });
 ctx.globalThis = ctx;
 runInContext(gateSrc, ctx);
 runInContext(sumSrc, ctx);
@@ -174,6 +174,34 @@ const twoPts = { points: [1, 2, 3, 4].map((i) => ({ quote: '第二句话在这�
 v = S.validate(twoPts, lines, sent, null, { maxPoints: 2 });
 ok('机翻时校验层也砍到 2 条', v.points.length === 2, v.points.length);
 
+console.log('字幕与标题的重合（内容级提示）');
+const goodSubs = [];
+for (let i = 0; i < 30; i++) goodSubs.push({ sid: i, from: i * 3, to: i * 3 + 2.8, content: '这里讲怎么让 AI 自己跑测试，写完代码先跑一遍再说。' });
+const leechSubs = [];
+for (let i = 0; i < 30; i++) leechSubs.push({ sid: i, from: i * 3, to: i * 3 + 2.8, content: '像这种大个体的宽体金线蛭就不吸血，侧盲囊很明显。' });
+const tok = G.titleTokens('别再手动帮 AI 点测试了！');
+ok('标题切词：中文两字窗口 + 英文词', tok.includes('测试') && tok.includes('ai') && tok.includes('手动'), tok);
+ok('短标题切词不炸', G.titleTokens('').length === 0 && G.titleTokens('哈').length === 0);
+const ovGood = G.titleOverlap('别再手动帮 AI 点测试了！', goodSubs);
+ok('对得上的字幕：有命中', ovGood.hits > 0, ovGood);
+const ovBad = G.titleOverlap('感觉模型降智了怎么办？', leechSubs);
+ok('水蛭字幕 × 模型标题：零命中', ovBad.hits === 0 && ovBad.tokens >= 6, ovBad);
+ok('零命中给 title-mismatch', G.titleOverlap('感觉模型降智了怎么办？', leechSubs).hits === 0);
+ok('没标题就跳过（比例记 1）', G.titleOverlap('', leechSubs).ratio === 1);
+console.log('闸门里的内容级提示（stub fetch）');
+const leechBody = [];
+for (let i = 0; i < 30; i++) leechBody.push({ from: i * 2, to: i * 2 + 1.8, content: '像这种大个体的宽体金线蛭就不吸血，侧盲囊很明显。' });
+globalThis.__testFetch = async function (url) {
+  const u = String(url);
+  if (u.indexOf('player/v2') >= 0) { const obj = { code: 0, message: '0', data: { subtitle: { subtitles: [{ lan: 'ai-zh', subtitle_url: '//example.test/sub.json' }] } } }; return { ok: true, status: 200, json: async () => obj, text: async () => JSON.stringify(obj) }; }
+  const fb = { body: leechBody }; return { ok: true, status: 200, json: async () => fb, text: async () => JSON.stringify(fb) };
+};
+G.GATE.RETRY_DELAY_MS = 0;
+const gated = await G.gateSubtitle({ aid: 1, cid: 2, pageDur: 60, title: '感觉模型降智了怎么办？' }, null, { attempts: 3, earlyVotes: 2 });
+ok('闸门仍然放行（只提示不拦）', gated.verdict === 'stable' && gated.sentences.length === 30, gated.verdict);
+ok('放行同时标 title-mismatch', gated.hint === 'title-mismatch', gated.titleCheck);
+const okTitle = await G.gateSubtitle({ aid: 1, cid: 2, pageDur: 60, title: '水蛭怎么吸血' }, null, { attempts: 3, earlyVotes: 2 });
+ok('标题对得上就不提示', okTitle.hint === '' && okTitle.titleCheck.hits > 0, okTitle.titleCheck);
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

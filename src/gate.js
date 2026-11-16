@@ -20,6 +20,44 @@
     return String(s || '').replace(/\s+/g, '').replace(/[，。！？、；："'（）《》…—,.!?;:()]/g, '');
   }
 
+  // 内容级提示：时长闸门只证明「长度像」，挡不住「时长吻合但内容无关」的字幕。
+  // 这里比标题词与字幕正文的重合：一个都对不上，就够可疑了。只提示，不拦。
+  const TITLE_MIN_TOKENS = 6; // 标题太短时两字窗口太少，判不准，宁可不提示
+
+  function titleTokens(title) {
+    const seen = {};
+    const out = [];
+    const s = String(title || '').toLowerCase();
+    (s.match(/[a-z0-9][a-z0-9+#.\-]*/g) || []).forEach(function (w) {
+      const t = w.replace(/[.\-]+$/, '');
+      if (t.length >= 2 && !seen[t]) { seen[t] = 1; out.push(t); }
+    });
+    (s.match(/[\u4e00-\u9fa5]+/g) || []).forEach(function (run) {
+      if (run.length < 2) return;
+      for (let i = 0; i + 2 <= run.length; i++) {
+        const t = run.slice(i, i + 2);
+        if (!seen[t]) { seen[t] = 1; out.push(t); }
+      }
+    });
+    return out;
+  }
+
+  function titleOverlap(title, sentences) {
+    const tokens = titleTokens(title);
+    const hay = normalize((sentences || []).map(function (x) { return x.content || ''; }).join('')).toLowerCase();
+    let hits = 0;
+    for (let i = 0; i < tokens.length; i++) { if (hay.indexOf(tokens[i]) >= 0) hits += 1; }
+    return { tokens: tokens.length, hits: hits, ratio: tokens.length ? hits / tokens.length : 1 };
+  }
+
+  function withTitleCheck(res, meta) {
+    if (!meta || !meta.title) return res;
+    const tc = titleOverlap(meta.title, res.sentences);
+    res.titleCheck = tc;
+    res.hint = (tc.tokens >= TITLE_MIN_TOKENS && tc.hits === 0) ? 'title-mismatch' : '';
+    return res;
+  }
+
   function stats(sentences, pageDur) {
     const lines = sentences.length;
     const chars = sentences.reduce((n, s) => n + normalize(s.content).length, 0);
@@ -346,7 +384,7 @@
       attempts[attempts.length - 1].votes = votes;
       if (votes >= EARLY_VOTES) {
         const win = seen.get(file.hash);
-        return { verdict: 'stable', track: win.track, sentences: win.sentences, stats: win.stats, attempts, hash: win.hash, votes: win.count };
+        return withTitleCheck({ verdict: 'stable', track: win.track, sentences: win.sentences, stats: win.stats, attempts, hash: win.hash, votes: win.count }, meta);
       }
       await sleep(GATE.RETRY_DELAY_MS);
     }
@@ -354,10 +392,10 @@
     const top = ranked[0];
     const tie = ranked.length > 1 && ranked[1].count === top.count;
     if (top && top.count >= 2 && !tie) {
-      return { verdict: 'stable', track: top.track, sentences: top.sentences, stats: top.stats, attempts, hash: top.hash, votes: top.count };
+      return withTitleCheck({ verdict: 'stable', track: top.track, sentences: top.sentences, stats: top.stats, attempts, hash: top.hash, votes: top.count }, meta);
     }
     if (ranked.length === 1) {
-      return { verdict: 'single', track: top.track, sentences: top.sentences, stats: top.stats, attempts, hash: top.hash, votes: 1 };
+      return withTitleCheck({ verdict: 'single', track: top.track, sentences: top.sentences, stats: top.stats, attempts, hash: top.hash, votes: 1 }, meta);
     }
     if (ranked.length > 1) {
       // 每次拿到的都是不同的文件，而且都通过了时长/结构检查 —— 这种情况不能猜。
@@ -371,6 +409,8 @@
     normalize,
     stats,
     judge,
+    titleTokens,
+    titleOverlap,
     pickTrack,
     resolveVideo,
     fetchTracks,

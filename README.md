@@ -1,6 +1,6 @@
 # B站字幕笔记
 
-[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 656 条离线测试 · MIT
+[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 665 条离线测试 · MIT
 
 跟播放头边看边写；每条结论都带**逐字引文 + 可点的时间**，点一下跳回原句。浏览器扩展（Edge / Chrome，MV3）。
 
@@ -20,7 +20,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、656 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、665 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 装（约 3 分钟）
 
@@ -37,6 +37,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 笔记默认只显示一行摘要（有逐字引文也不铺开），点摘要才展开引文和解读；从大纲点一条会顺手把它展开
 - 面板跟着播放头走：跨过一段末尾才写这一段，没看过的地方不写、不剧透
 - 跳过的区间画成虚线占位条：要么「总结这段」（花钱），要么「去看这段」
+- 字幕只取到过一份（面板写「单次取样（未复核）」）时，工具栏会多一个「再取样」：再取一次，两次一致才算核过（B站 字幕接口会抖，也会张冠李戴）
 - 「导出」出 Markdown：frontmatter 带 `bvid` / `tags`（bilibili、视频笔记），有笔记时先给一段 `## 大纲`，正文每句都能点回原句，直接进 Obsidian
 - 合集 / 多 P：面板多一个「导出全部 P」，把所有分 P 的字幕导进同一个 Markdown（中途可以停）；哪一 P 没导出来、为什么，写在文件末尾
 - **只导你要的那一段**：课程清单里每集前面有勾选框，按 S1 / S2 分组、每组可「全选」；勾几集就只导这几集，文件名叫「（S2 · 9 集）」，frontmatter 里 `scope: S2`。第一次没导出来的集会在结尾自动再取一轮（字幕接口会抖），还不行才写进「未导出的集」并给原因
@@ -63,7 +64,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 656 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 665 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```
