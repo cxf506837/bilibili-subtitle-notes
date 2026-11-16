@@ -1046,19 +1046,37 @@
     if (!any) box.classList.remove('open');
   }
 
+  // 哪些状态下「再取一次」是有意义的：
+  //   single     —— 只取到过一份，没交叉核对；
+  //   fromCache  —— 现在用的是很久以前存下的那份，可能根本不属于这个视频；
+  //   rejected   —— 这次取到的字幕对不上。B站 同一个 (aid,cid) 连取几次会返回不同文件，
+  //                 重跑一次有可能拿到对的那份（实测 9 集批量里 5 集是这么救回来的）。
+  // 不该出现的：need-login / no-subs / empty-url —— 重跑一百次也是同一个结果，给了按钮等于骗人。
+  function verifyReasons() {
+    const out = [];
+    if (state.fromCache) out.push('cache');
+    if (state.verdict === 'single') out.push('single');
+    if (state.verdict === 'rejected') out.push('rejected');
+    return out;
+  }
+
   function syncVerifyBtn() {
     const b = $('btnVerify');
     if (!b) return;
-    const show = !state.batch.running && !state.hard.active && (state.verdict === 'single' || state.fromCache);
+    const why = verifyReasons();
+    const show = !state.batch.running && !state.hard.active && why.length > 0;
     b.classList.toggle('hidden', !show);
     syncMore();
     if (!show) return;
     // 缓存恢复出来的字幕可能是很久以前那一份（甚至内容不是这个视频的）：
     // 明说「重新核对」，点了就丢掉缓存重取一份对照，取不到会退回原来那份。
-    b.textContent = state.fromCache ? '重新核对' : '再取样';
+    const rejected = why.indexOf('rejected') >= 0;
+    b.textContent = state.fromCache ? '重新核对' : (rejected ? '再试一次' : '再取样');
     b.title = state.fromCache
       ? '现在用的是上次存下的字幕。点一下重新取一份对照：两次一致才算核过；取不到还会用上次那份'
-      : '这份字幕只取到过一份、没交叉核对：再取一次，两次一致才算核过';
+      : (rejected
+        ? '这次取到的字幕和视频对不上（时长或内容不一致）。B站 同一集连取几次会返回不同文件，重取一次可能拿到对的那份'
+        : '这份字幕只取到过一份、没交叉核对：再取一次，两次一致才算核过');
   }
 
   // 剪贴板：扩展页/内容脚本的权限模型不一样，先试 navigator.clipboard，失败退到 execCommand。
