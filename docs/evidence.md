@@ -533,3 +533,16 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 顺带的判断：`rows:1` 只显示「已经能讲清」那行是因为测试用的 study-state 里概念名是 `a` / `r`（_lab 造的数据），不是渲染 bug；stream 前四个子元素是 note / note awayn / note / note，也正常。
 
 补一刀（1.4.12）：合并规则一开始写成 `.course:has(+ .mast:not(.hidden))`，没有排除课程条自己隐藏的情况。单视频也有 `courseModel`（kind single、id `video:<BV>`），课程条会被 `.hidden` 掉，但掌握度仍可能显示（course_id 是 `video:<BV>` 的学习状态），那时 `.mast` 会白丢上半圆角并上移 1px。改成 `.course:not(.hidden):has(+ .mast:not(.hidden))`：课程条在才贴。真机复验：系列页仍是 `courseBottom 126 / mastTop 125 / radius 0 / margin -1`。
+
+## 二十五、/video/av…老链接不再永远停在「初始化…」（2026-11-16，1.4.13）
+
+起因是一次非视频页的健壮性巡检：`content_scripts.matches` 只写了 `https://www.bilibili.com/video/*`，所以首页 / 专栏 / 番剧 / 直播页本来就没有面板（符合设计）。但在 `/video/*` 范围内换了个入口试，发现老链接是真坑。
+
+| 页面 | 改前 | 改后 |
+| --- | --- | --- |
+| `https://www.bilibili.com/video/av170001` | 面板在，`statusText` 永远「初始化…」，`verdict` 空、`bvid` 空（`boot()` 里 `if (!bvid) return;` 直接早退，什么都不说） | `bvid BV17x411w7KC`、`verdict rejected`、状态条「字幕和视频对不上」 |
+| `?p=99`（不存在的分P） | 未测 | `stable`、`bvid BV1GyZYYNErW`（B站 实际给的是 P1，不报错） |
+
+修法：`aidFromUrl()` 从 `/video/av<aid>` 拿到 aid，问一次 `x/web-interface/view?aid=` 换 `bvid`（带 `credentials: include`，结果按 aid 缓存），拿到之后整条链路照旧；换不到时才给一句人话「这个页面读不到 BV 号（番剧、课程、直播页暂时不支持），取不到字幕」。
+
+同一轮还修了探针自己的 bug：`extCtxOf()` 把主 frame 的 frameId 存在全局变量里，第二个 tab 就全都匹配不上（表现为满屏 `no-ctx`），改成按 session 记。

@@ -2641,6 +2641,29 @@
     return m ? m[1] : '';
   }
 
+  function aidFromUrl() {
+    const m = location.pathname.match(/\/video\/av(\d+)/i);
+    return m ? m[1] : '';
+  }
+
+  // /video/av<aid> 这种老链接：B站 有时不会重写成 BV，boot 拿不到 bvid 就直接 return，
+  // 界面永远停在「初始化…」（真机 av170001 实测）。所以用 aid 问一次 view 接口换 bvid，
+  // 换到之后整条链路照旧，导出的链接也指向 /video/<bvid>。
+  const aidCache = {};
+  async function bvidFromAid(aid) {
+    if (aidCache[aid]) return aidCache[aid];
+    try {
+      const res = await fetch('https://api.bilibili.com/x/web-interface/view?aid=' + encodeURIComponent(aid), { credentials: 'include' });
+      if (!res.ok) return '';
+      const j = await res.json();
+      const bv = j && j.code === 0 && j.data && j.data.bvid ? String(j.data.bvid) : '';
+      if (bv) aidCache[aid] = bv;
+      return bv;
+    } catch (e) {
+      return '';
+    }
+  }
+
   // 分 P：B站 切 P 会改 URL 的 ?p=N（没写就是 P1）。content script 读不到页面里的 __INITIAL_STATE__，
   // 所以 URL 是主信号；分 P 列表点不动 URL 的入口靠 bindVideo 里的时长自校正兜底。
   // 时长自校正救回来的分 P（URL 没写 ?p= 的那些入口）：记住它，别下一次 href 变化又踢回 P1。
@@ -2834,8 +2857,13 @@
   // 分 P 切换会连续触发两次 boot（href 变化 + 时长自校正），加个令牌：只有最后一次的继续往下走。
   let bootSeq = 0;
   async function boot(force, wantP) {
-    const bvid = bvidFromUrl();
-    if (!bvid) return;
+    let bvid = bvidFromUrl();
+    if (!bvid) {
+      const aid = aidFromUrl();
+      if (!aid) return;
+      bvid = await bvidFromAid(aid);
+      if (!bvid) { setStatus('bad', '这个页面读不到 BV 号（番剧、课程、直播页暂时不支持），取不到字幕'); return; }
+    }
     const p = Number(wantP) || pFromUrl();
     // 注意：令牌必须在「确实要重跑」之后才自增。放在早退之前会误伤——
     // URL 被 B站 改写（加 vd_source 之类）会触发一次 boot，它早退却把令牌换了，
