@@ -1,6 +1,6 @@
 # B站字幕笔记
 
-[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 686 条离线测试 · MIT
+[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 720 条离线测试 · MIT
 
 跟播放头边看边写；每条结论都带**逐字引文 + 可点的时间**，点一下跳回原句。浏览器扩展（Edge / Chrome，MV3）。
 
@@ -20,7 +20,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、686 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、720 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 装（约 3 分钟）
 
@@ -49,6 +49,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - **学完把掌握度带回面板**：agent 拷打完把 `study-state.json` 复制到剪贴板，点扩展图标 → 「应用到面板」；回到视频页，课程条下面就是「掌握度 懂 5 · 半懂 11 · 没考 75」，点开能看到「接着学」该跳哪一秒，和已经能讲清的概念。只读你复制的那一份，不联网
 - **配一个 agent 学完它**：仓库里带 `skills/bili-study`（复制到 agent 的 skills 目录即可）。它会按你的目标裁掉不需要的概念、出依赖图、用**逐字原话**一道一道考你，答完把「懂 / 半懂 / 没考」写进 `study-state.json`。流程见 [skills/bili-study/SKILL.md](skills/bili-study/SKILL.md)
 - **合集 / 多 P 顶部有课程条**：课程名 + 「24 集 · 2 小时 57 分 · 已看 1 集」，点开是每集清单（✓ 是看过的，当前集高亮），点一集直接跳过去；「继续」跳到下一集没看过的。进度记在本机，关掉浏览器再回来还在
+- **概念视图**：工具栏「概念」把一集集抽出来的概念卡拼成「这门课到底讲了哪些概念」——按集分组，每个概念写着它是什么、在哪几集第几秒被讲到、点原话直接跳过去；同一概念跨集出现会标「跨 2 集」并排到最前（这些才是知识点之间的连接）；回流过掌握度后直接标「懂 / 半懂」。只在这一集出现、标题里也没有的词会被标灰（可能是闲聊），不删
 - **没填 API Key 也能用**：抓完字幕直接点「导出」，拿到的是逐句字幕全文（每句一个时间戳、可点回原句），只是没有 AI 整理的结论
 - 关掉页面再打开，笔记从 IndexedDB 原样恢复，不重跑闸门、不重复花钱
 - 失败会说清是哪一种：没有字幕 / 字幕只有一部分 / 字幕和视频对不上 / 没登录 / 清晰度太低 …
@@ -63,12 +64,12 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 
 ## 费用
 
-70 分钟视频约 120 块 ≈ 6~7 万 input token，几分钱到一毛钱（按 ¥1/百万 token 的模型算）。面板右上角实时显示已花 token。
+70 分钟视频约 120 段，实测约 1010 token/段，合计约 12 万 token ≈ ¥0.2（DeepSeek 现价：输入 ¥2/M、缓存命中 ¥0.2/M、输出 ¥3/M）。面板右上角按这个真价算实时花费，鼠标悬停能看输入/命中/输出三段。不会自己偷偷花：默认只有你点「总结这段 / 整理全片」才调模型，另有单视频与每日 token 上限（设置里可调，0 = 不限）。
 
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 686 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 720 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```

@@ -215,7 +215,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 const VIDEO_URL = /^https:\/\/www\.bilibili\.com\/video\//;
 const CONTENT_FILES = [
   'src/budget.js', 'src/gate.js', 'src/summarize.js', 'src/batch.js', 'src/hardsub.js', 'src/frames.js', 'src/searchindex.js', 'src/course.js', 'src/coursestore.js',
-  'src/queueplan.js', 'src/studystate.js', 'src/concepts.js', 'src/study.js', 'src/content.js',
+  'src/queueplan.js', 'src/studystate.js', 'src/concepts.js', 'src/conceptview.js', 'src/study.js', 'src/content.js',
 ];
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }

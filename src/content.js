@@ -92,7 +92,7 @@
     '.wrap.collapsed .bar { display: none !important; }',
     '.wrap.collapsed .acts { flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; height: 100%; padding: 10px 0 12px; border-bottom: 0; }',
     '.wrap.collapsed .acts > *:not(#btnFold):not(.foldonly) { display: none !important; }',
-    '.wrap.collapsed .outline, .wrap.collapsed .stream, .wrap.collapsed .ask { display: none !important; }',
+    '.wrap.collapsed .outline, .wrap.collapsed .concepts, .wrap.collapsed .stream, .wrap.collapsed .ask { display: none !important; }',
     // 收起态：一整条显眼的蓝色贴边标签。之前的 44px 灰字在深色页面上几乎看不见（用户当面提过两次）
     '.foldonly { display: none; }',
     '.wrap.collapsed .foldonly { display: flex; align-items: center; justify-content: center; }',
@@ -243,6 +243,35 @@
   '.csection .csall:hover { text-decoration: underline; }',
   '.cfoot { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--bnline); }',
   '.cfoot .cnum { flex: 1; min-width: 0; font-size: 11px; color: var(--bnmuted); }',
+    // 概念视图：按集抽出来的概念卡拼成「这门课的概念」，点一处原话跳到那一秒
+    '.concepts { padding: 6px 10px 8px; border-bottom: 1px solid var(--bnline); max-height: 46vh; overflow: auto; }',
+    '.concepts.hidden { display: none; }',
+    '.cvh { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }',
+    '.cvh .cvt { font-size: 11px; font-weight: 600; flex: 0 0 auto; }',
+    '.cvh .cvm { flex: 1; min-width: 0; font-size: 11px; color: var(--bnmuted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+    '.cvh .cvonly { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--bnmuted); cursor: pointer; flex: 0 0 auto; }',
+    '.cvh .cvonly input { margin: 0; cursor: pointer; }',
+    '.cvg { display: flex; gap: 6px; font-size: 11px; font-weight: 600; color: var(--bnmuted); margin: 8px 0 2px; padding-top: 5px; border-top: 1px dashed var(--bnline2); }',
+    '.cvg:first-child { border-top: 0; margin-top: 0; padding-top: 0; }',
+    '.cvg .cvgt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+    '.cvi { padding: 4px 0 5px; border-bottom: 1px dotted var(--bnline); }',
+    '.cvi:last-child { border-bottom: 0; }',
+    '.cvi.sus { opacity: .5; }',
+    '.cvi .cvn { font-weight: 600; }',
+    '.cvi .cvk { font-size: 10px; color: var(--bnmuted); margin-left: 4px; }',
+    '.cvi .cvcr { font-size: 10px; color: var(--bnaccentInk); margin-left: 4px; }',
+    '.cvi .cvs { font-size: 10px; margin-left: 4px; padding: 0 4px; border-radius: 3px; }',
+    '.cvi .cvs.understood { color: #0a8f5c; background: rgba(46,204,113,.14); }',
+    '.cvi .cvs.shaky { color: #b7791f; background: rgba(240,160,32,.16); }',
+    '.cvi .cvd { font-size: 11px; color: var(--bnmuted); line-height: 1.5; margin-top: 1px; }',
+    '.cvi .cva { display: flex; gap: 6px; align-items: baseline; font-size: 11px; line-height: 1.5; margin-top: 1px; cursor: pointer; }',
+    '.cvi .cva:hover .cvq { color: var(--bnaccentInk); }',
+    '.cvi .cva:focus-visible { outline: 2px solid var(--bnaccent); outline-offset: -2px; border-radius: 4px; }',
+    '.cvi .cva .cvtt { flex: 0 0 auto; color: var(--bnaccent); font-variant-numeric: tabular-nums; }',
+    '.cvi .cva .cvep { flex: 0 0 auto; color: var(--bnmuted); }',
+    '.cvi .cva .cvq { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .72; }',
+    '.cvempty { font-size: 12px; line-height: 1.7; opacity: .72; padding: 2px 0 4px; }',
+    '.cvempty .cvb { margin-top: 8px; }',
   ].join('');
 
   const HTML = [
@@ -267,6 +296,7 @@
     '</div>',
     '<div class="acts">',
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▸</button>',
+    '<button class="btn hidden" id="btnConcepts" title="这门课的概念：点一处原话跳到那一秒">概念 ▸</button>',
     '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
     '<button class="btn hidden" id="btnAll" title="把全片所有段落一次整理完">整理全片</button>',
     '<button class="btn" id="btnMore" title="更多：设置 / 重新核对字幕 / 画面字幕 / 导出全部 P / 诊断">⋯</button>',
@@ -314,6 +344,12 @@
     '<button class="btn sm awaymini hidden" id="awayMini">补课</button>',
     '<div class="vnote hidden" id="vnote"></div>',
     '<div class="outline hidden" id="outline"></div>',
+    '<div class="concepts hidden" id="concepts">',
+    '<div class="cvh"><span class="cvt">概念</span><span class="cvm" id="conceptMeta"></span>',
+    '<label class="cvonly" title="只留在这门课两集以上出现过的概念"><input type="checkbox" id="conceptCross" />只看跨集</label>',
+    '<button class="btn sm" id="conceptBuild" title="每隔 120 句问一次模型抽概念；结果缓存，重复抽不花钱">抽概念</button></div>',
+    '<div class="cvlist" id="conceptList"></div>',
+    '</div>',
     '<div class="streamwrap">',
     '<div class="stream" id="stream"></div>',
     '<button class="btn jump hidden" id="jumpBtn" title="回到最新一条笔记">回到最新 ↓</button>',
@@ -414,6 +450,7 @@
       if (!m || m.kind === 'single') {
         courseEl.classList.add('hidden');
         courseModel = null;
+        refreshConcepts();
         return;
       }
       courseModel = m;
@@ -434,6 +471,7 @@
       courseNextEl.classList.toggle('hidden', !nx);
       if (nx) courseNextEl.title = '跳到第 ' + nx.index + ' 集：' + nx.title;
       refreshStudy();
+      refreshConcepts();
     } catch (e) {
       courseEl.classList.add('hidden');
     }
@@ -838,6 +876,7 @@
         studyStates = (window.BnStudyState ? window.BnStudyState.fromStorage(all) : [])
           .map(function (x) { return x.state; });
         refreshStudy();
+        refreshConcepts(); // 掌握度回流后概念卡上的「懂 / 半懂」要跟着变
       });
     } catch (e) {}
   }
@@ -930,6 +969,296 @@
     setMastOpen(!mastEl.classList.contains('open'));
   });
 
+  // ---- 概念视图：把按集缓存的概念卡拼成「这门课的概念」 ----
+  const conceptEl = $('concepts');
+  const conceptListEl = $('conceptList');
+  const conceptMetaEl = $('conceptMeta');
+  const conceptBuildEl = $('conceptBuild');
+  const conceptCrossEl = $('conceptCross');
+  let conceptData = null;
+
+  function conceptCids() {
+    if (courseModel) return courseModel.episodes.map(function (ep) { return ep.cid; });
+    const m = state.meta;
+    return m && m.cid ? [m.cid] : [];
+  }
+  function conceptTitles() {
+    if (courseModel) return courseModel.episodes.map(function (ep) { return ep.title || ''; });
+    const m = state.meta;
+    return m ? [m.title || ''] : [];
+  }
+  // 掌握度来自 agent 拷打后回流的那份 study-state：这里只读，不自己判
+  function masteryMap() {
+    const st = currentStudy();
+    const map = {};
+    if (!st || !window.BnConcept) return map;
+    (st.concepts || []).forEach(function (c) {
+      if (c && c.name) map[window.BnConcept.conceptKey(c.name)] = c.status;
+    });
+    return map;
+  }
+  function canExtractConcepts() {
+    if (state.hasKey === false || !window.BnConcept) return false;
+    if (courseModel) return courseModel.episodes.length > 0;
+    return !!(state.meta && state.meta.cid && state.sentences.length);
+  }
+  // 抽哪些集：课程里勾了就用勾的，没勾就全部；单视频就是这一集
+  function conceptTargets() {
+    if (courseModel) {
+      const picks = pickedEps();
+      return picks.length ? picks : courseModel.episodes;
+    }
+    const m = state.meta;
+    if (!m || !m.cid || !state.sentences.length) return [];
+    return [{ index: 1, title: m.title || document.title, cid: m.cid, url: location.href, duration: Number(m.pageDur) || state.sentences.length * 5 }];
+  }
+  function conceptCalls(targets) {
+    let n = 0;
+    const curCid = state.meta && state.meta.cid ? String(state.meta.cid) : '';
+    targets.forEach(function (ep) {
+      if (curCid && String(ep.cid) === curCid && state.sentences.length) {
+        n += Math.max(1, Math.ceil(state.sentences.length / 120));
+      } else {
+        n += Math.max(1, Math.ceil((Number(ep.duration) || 300) / 300));
+      }
+    });
+    return n;
+  }
+  function conceptEstimateText(targets) {
+    const calls = conceptCalls(targets);
+    let money = '';
+    if (window.BnBudget && window.BnBudget.costOf) {
+      const c = window.BnBudget.costOf({ miss: 2400, hit: 0, out: 300 }) * calls;
+      money = ' ≈ ¥' + (c >= 0.01 ? c.toFixed(2) : c.toFixed(3));
+    }
+    return calls + ' 次模型调用' + money;
+  }
+  // 有概念时按钮留在工具栏（它是最该被看见的入口）；还没抽过时收进「⋯」，否则一行挤 6 个按钮会换行。
+  function placeConceptBtn(inBar) {
+    const b = $('btnConcepts');
+    const mb = $('btnMore');
+    const box = $('more');
+    if (!b || !mb || !box) return;
+    const inMore = b.parentNode === box;
+    if (inBar && inMore) mb.parentNode.insertBefore(b, mb);
+    else if (!inBar && !inMore) box.appendChild(b);
+  }
+  function syncConceptBtn() {
+    const b = $('btnConcepts');
+    if (!b) return;
+    const n = conceptData ? conceptData.totals.concepts : 0;
+    const show = n > 0 || canExtractConcepts();
+    placeConceptBtn(n > 0);
+    b.classList.toggle('hidden', !show);
+    if (!show) { syncMore(); return; }
+    const open = !conceptEl.classList.contains('hidden');
+    const inBar = b.parentNode !== $('more');
+    b.textContent = inBar ? ('概念 ' + (open ? '▾' : '▸')) : '概念';
+    syncMore();
+    b.title = n ? ('这门课 ' + n + ' 个概念 · 点一处原话跳到那一秒') : '这门课还没抽过概念：点开抽一次（结果缓存，重复抽不花钱）';
+  }
+  function conceptAnchorRow(a, groupEp) {
+    const row = document.createElement('div');
+    row.className = 'cva';
+    row.setAttribute('role', 'link');
+    row.dataset.ep = String(Number(a.ep) || 0);
+    row.dataset.t = String(Math.floor(Number(a.t) || 0));
+    row.tabIndex = 0;
+    const tt = document.createElement('span');
+    tt.className = 'cvtt';
+    tt.textContent = window.BnConceptView.fmtClock(a.t);
+    row.appendChild(tt);
+    if (Number(a.ep) !== Number(groupEp)) {
+      const epl = document.createElement('span');
+      epl.className = 'cvep';
+      epl.textContent = a.epLabel || ('第 ' + a.ep + ' 集');
+      row.appendChild(epl);
+    }
+    const q = document.createElement('span');
+    q.className = 'cvq';
+    q.textContent = a.quote || '（点一下跳到这一秒）';
+    row.appendChild(q);
+    const go = function (ev) { if (ev) ev.stopPropagation(); jumpConceptAnchor(a); };
+    row.addEventListener('click', go);
+    row.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(ev); }
+    });
+    row.title = '跳到这一秒' + (a.epTitle ? '：' + a.epTitle : '');
+    return row;
+  }
+  function renderConcepts() {
+    if (!conceptEl || !conceptListEl) return;
+    conceptListEl.textContent = '';
+    const tot = conceptData ? conceptData.totals : { concepts: 0, cross: 0, anchors: 0 };
+    conceptMetaEl.textContent = tot.concepts ? (tot.concepts + ' 个概念' + (tot.cross ? ' · 跨集 ' + tot.cross : '') + ' · ' + tot.anchors + ' 处原话') : '';
+    const running = !!(state.batch && state.batch.running);
+    conceptBuildEl.textContent = running ? '停止抽概念' : (tot.concepts ? '重新抽' : '抽概念');
+    syncConceptBtn();
+    if (!tot.concepts) {
+      const d = document.createElement('div');
+      d.className = 'cvempty';
+      const tg = conceptTargets();
+      if (!tg.length) {
+        d.textContent = '等字幕就绪后才能抽概念。';
+      } else if (state.hasKey === false) {
+        d.textContent = '抽概念要调用模型：先在「设置」里填一个 API Key。不填也能导出字幕全文。';
+      } else {
+        const picks = courseModel ? pickedEps().length : 0;
+        d.textContent = '这门课还没抽过概念。抽概念 = 每隔 120 句问一次模型「这里出现了哪些后面还会用到的概念」，原话和时间由本地按句子取，不让模型复述。'
+          + (picks ? '现在只会抽你勾选的 ' + picks + ' 集。' : (courseModel ? '还没勾选集，会抽整门课 ' + courseModel.episodes.length + ' 集；想省钱先在清单里勾几集。' : ''))
+          + '要跑 ' + conceptEstimateText(tg) + '，用你自己的额度；结果缓存在本机，重复抽不花钱。';
+      }
+      conceptListEl.appendChild(d);
+      return;
+    }
+    const crossOnly = !!(conceptCrossEl && conceptCrossEl.checked);
+    let shown = 0;
+    conceptData.groups.forEach(function (g) {
+      const items = g.items.filter(function (it) { return !crossOnly || it.cross; });
+      if (!items.length) return;
+      const gh = document.createElement('div');
+      gh.className = 'cvg';
+      const gt = document.createElement('span');
+      gt.className = 'cvgt';
+      // 集标题自己就带着「S2-0 …」前缀，别再拼一遍
+      let ttl = String(g.title || '');
+      if (g.label && ttl.indexOf(g.label) === 0) ttl = ttl.slice(g.label.length).replace(/^[\s·:：\-—|]+/, '');
+      gt.textContent = g.label + (ttl ? ' · ' + ttl.slice(0, 16) : '');
+      gh.appendChild(gt);
+      const gc = document.createElement('span');
+      gc.textContent = String(items.length);
+      gh.appendChild(gc);
+      conceptListEl.appendChild(gh);
+      items.forEach(function (it) {
+        shown++;
+        const el = document.createElement('div');
+        el.className = 'cvi' + (it.suspect ? ' sus' : '');
+        if (it.suspect) el.title = '只在这一集出现、集标题里也没有这个词：可能是闲聊或一次性的例子（先标灰，不删）';
+        const head = document.createElement('div');
+        const nm = document.createElement('span');
+        nm.className = 'cvn';
+        nm.textContent = it.name;
+        head.appendChild(nm);
+        const kd = document.createElement('span');
+        kd.className = 'cvk';
+        kd.textContent = it.kind;
+        head.appendChild(kd);
+        if (it.cross) {
+          const cr = document.createElement('span');
+          cr.className = 'cvcr';
+          cr.textContent = '跨 ' + it.eps.length + ' 集';
+          head.appendChild(cr);
+        }
+        if (it.status === 'understood' || it.status === 'shaky') {
+          const sb = document.createElement('span');
+          sb.className = 'cvs ' + it.status;
+          sb.textContent = it.status === 'understood' ? '懂' : '半懂';
+          head.appendChild(sb);
+        }
+        el.appendChild(head);
+        if (it.def) {
+          const df = document.createElement('div');
+          df.className = 'cvd';
+          df.textContent = it.def;
+          el.appendChild(df);
+        }
+        it.anchors.slice(0, 3).forEach(function (a) { el.appendChild(conceptAnchorRow(a, g.ep)); });
+        if (it.anchors.length > 3) {
+          const more = document.createElement('div');
+          more.className = 'cvd';
+          more.textContent = '还有 ' + (it.anchors.length - 3) + ' 处提到它';
+          el.appendChild(more);
+        }
+        conceptListEl.appendChild(el);
+      });
+    });
+    if (!shown) {
+      const d = document.createElement('div');
+      d.className = 'cvempty';
+      d.textContent = crossOnly ? '没有跨集出现的概念。取消「只看跨集」看全部。' : '这门课还没有概念。';
+      conceptListEl.appendChild(d);
+    }
+  }
+  function refreshConcepts() {
+    if (!window.BnConceptView || !window.BnConcept) return;
+    const cids = conceptCids();
+    if (!cids.length) { conceptData = null; renderConcepts(); return; }
+    try {
+      chrome.storage.local.get(null, function (all) {
+        conceptData = window.BnConceptView.group(window.BnConceptView.collect(all, cids), {
+          keyOf: window.BnConcept.conceptKey,
+          merge: window.BnConcept.merge,
+          titles: conceptTitles(),
+          mastery: masteryMap(),
+        });
+        renderConcepts();
+      });
+    } catch (e) { conceptData = null; renderConcepts(); }
+  }
+  function jumpConceptAnchor(a) {
+    if (!a) return;
+    if (!courseModel || !window.BnConceptView) { seekTo(a.t); return; }
+    const ep = courseModel.episodes.filter(function (x) { return Number(x.index) === Number(a.ep); })[0];
+    const same = ep && String(ep.bvid) === String(state.bvid) && state.meta && String(ep.cid) === String(state.meta.cid);
+    if (same) { seekTo(a.t); return; }
+    const url = (ep && ep.url) || a.url;
+    if (url) location.href = window.BnConceptView.withT(url, a.t);
+  }
+  async function extractConcepts() {
+    if (state.batch && state.batch.running) {
+      state.batch.cancel = true;
+      setStatus('warn', '正在停止抽概念…', '这一集跑完就停，已经抽到的会留下');
+      return;
+    }
+    if (!window.BnConcept) { setStatus('bad', '概念脚本没加载', '重新加载扩展再试'); return; }
+    if (state.hasKey === false) { setStatus('bad', '抽概念要模型：先在「设置」里填 API Key'); return; }
+    const targets = conceptTargets();
+    if (!targets.length) { setStatus('warn', '还没读到字幕，等面板出现字幕状态后再试'); return; }
+    state.batch = { running: true, cancel: false };
+    let good = [];
+    let done = 0;
+    let got = 0;
+    try {
+      if (courseModel) {
+        const r = await collectSubs(targets, '抽概念');
+        good = r.good;
+        if (!good.length) { setStatus('bad', '这些集的字幕都没过闸门', '多半是没登录 B站，或这些集没有 AI 字幕'); return; }
+      } else {
+        good = [{ index: 1, title: (state.meta && state.meta.title) || document.title, cid: state.meta.cid, url: location.href, sentences: state.sentences }];
+      }
+      for (let i = 0; i < good.length; i++) {
+        if (state.batch.cancel) break;
+        const g = good[i];
+        setStatus('warn', '抽概念 ' + (i + 1) + '/' + good.length + ' · 第 ' + g.index + ' 集 ' + String(g.title || '').slice(0, 14));
+        const cs = await conceptsForEpisode(g, function (k, total) {
+          setStatus('warn', '抽概念 ' + (i + 1) + '/' + good.length + ' · 第 ' + g.index + ' 集 第 ' + k + '/' + total + ' 块');
+        });
+        got += cs.length;
+        done++;
+      }
+      setStatus(state.batch.cancel ? 'warn' : 'ok',
+        (state.batch.cancel ? '已停止：' : '') + '抽到 ' + got + ' 个概念（' + done + '/' + good.length + ' 集）',
+        '点「概念」看跨集出现的那些：同一个概念在几集里提过，都列在同一张卡上');
+    } finally {
+      state.batch.running = false;
+      setTimeout(refreshConcepts, 350);
+    }
+  }
+  function toggleConcepts(on) {
+    const open = typeof on === 'boolean' ? on : conceptEl.classList.contains('hidden');
+    conceptEl.classList.toggle('hidden', !open);
+    if (open) refreshConcepts();
+    syncConceptBtn();
+  }
+  if (conceptCrossEl) {
+    try { conceptCrossEl.checked = localStorage.getItem('bn.cvCross') === '1'; } catch (e) {}
+    conceptCrossEl.addEventListener('change', function () {
+      try { localStorage.setItem('bn.cvCross', conceptCrossEl.checked ? '1' : '0'); } catch (e) {}
+      renderConcepts();
+    });
+  }
+  if (conceptBuildEl) conceptBuildEl.addEventListener('click', extractConcepts);
+
   function openEpisode(i) {
     const m = courseModel;
     if (!m || !m.episodes[i]) return;
@@ -963,6 +1292,7 @@
   });
   loadCourseProgress();
   loadStudyStates();
+  refreshConcepts();
 
   // 「这份字幕像机翻」必须写在界面上，不能只留在代码里。
   // 宁可说「仅供参考」，也不能让用户以为笔记不顺是因为模型笨。
@@ -3537,6 +3867,7 @@
   $('awayX').addEventListener('click', hideAway);
   $('awayMini').addEventListener('click', function () { openCatchup(state.away.last); });
   // 默认折叠：小节一生成就把笔记在流上方再列一遍，看起来像重复内容（用户实测反馈）
+  $('btnConcepts').addEventListener('click', function () { toggleConcepts(); });
   $('btnOutline').addEventListener('click', function () {
     const hid = outline.classList.toggle('hidden');
     this.textContent = hid ? '大纲 ▸' : '大纲 ▾';
@@ -3669,6 +4000,7 @@
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
       if (ch['apiKey']) state.hasKey = !!ch['apiKey'].newValue;
       if (Object.keys(ch).some(function (k) { return k.indexOf('bnstudy:') === 0; })) loadStudyStates();
+      if (Object.keys(ch).some(function (k) { return k.indexOf('bnc:') === 0; })) refreshConcepts();
       if (ch['bn.autoNotes']) state.autoNotes = ch['bn.autoNotes'].newValue === true;
       if (ch['bn.capVideo']) { const v = Number(ch['bn.capVideo'].newValue); if (isFinite(v) && v >= 0) state.caps.video = v; }
       if (ch['bn.capDay']) { const v = Number(ch['bn.capDay'].newValue); if (isFinite(v) && v >= 0) state.caps.day = v; }
