@@ -21,6 +21,7 @@ const FILES = [
   'course.test.mjs',      // 课程目录：合集/多P/单集、进度、继续上次
   'coursestore.test.mjs', // 课程存档：点图标时的「接着学」列表
   'queueplan.test.mjs',   // 整理全片：挑哪些块、按钮文案
+  'budget.test.mjs',      // 花的是用户的钱：分项计费 / 上限闸 / 估价
   'season.test.mjs',      // 课程选择性导出：只拼勾中的集
   'concepts.test.mjs',    // 概念抽取：切块 / 只认句子 id / 跨集合并
   'study.test.mjs',       // 学习包：JSON 结构 + Markdown 版面

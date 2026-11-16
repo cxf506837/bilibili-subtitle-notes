@@ -52,7 +52,7 @@ function presetIdFor(apiBase) {
 
 renderPresets();
 
-chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled', 'bn.goal'], (r) => {
+chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled', 'bn.goal', 'bn.autoNotes', 'bn.capVideo', 'bn.capDay'], (r) => {
   const apiBase = r.apiBase || 'https://api.deepseek.com/v1';
   $('apiBase').value = apiBase;
   $('model').value = r.model || 'deepseek-chat';
@@ -62,6 +62,9 @@ chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEna
   $('awayEnabled').checked = r['bn.awayEnabled'] !== false;
   $('visualEnabled').checked = r['bn.visualEnabled'] !== false;
   $('goal').value = r['bn.goal'] || '';
+  $('autoNotes').checked = r['bn.autoNotes'] === true;
+  $('capVideo').value = Number(r['bn.capVideo']) >= 0 ? Number(r['bn.capVideo']) : 120000;
+  $('capDay').value = Number(r['bn.capDay']) >= 0 ? Number(r['bn.capDay']) : 600000;
 });
 
 $('save').addEventListener('click', () => {
@@ -75,7 +78,10 @@ $('save').addEventListener('click', () => {
   const awayEnabled = $('awayEnabled').checked;
   const visualEnabled = $('visualEnabled').checked;
   const goal = $('goal').value.trim();
-  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled, 'bn.goal': goal }, () => {
+  const autoNotes = $('autoNotes').checked;
+  const capVideo = Math.max(0, Number($('capVideo').value) || 0);
+  const capDay = Math.max(0, Number($('capDay').value) || 0);
+  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled, 'bn.goal': goal, 'bn.autoNotes': autoNotes, 'bn.capVideo': capVideo, 'bn.capDay': capDay }, () => {
     show('已保存。回到 B站 视频页刷新即可生效。');
   });
 });

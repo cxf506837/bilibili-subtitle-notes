@@ -1012,3 +1012,7 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 3. **不能重复写同一段**：`state.curBlock` 记在飞行中的块，`startAll()` 排除它；`runQueue()` 里再按 `start` 去重兜底（第一版真机上出现过 `notes 5 > blocks 4`）。
 
 真机数字：BV1TDGT6vEqC 5/5、BV1pwnj6BEMP 9/9（≈¥0.013）、BV1irHx6dEEf 9/9；停止路径在 BV1TDGT6vEqC 上验过「队列清空 + stuck 0 + 再点能跑完」。离线测试 656 条（新增 `queueplan.test.mjs` 7 条）。
+
+## 2026-11-16 花钱闸（v1.4.17）
+
+默认不自动调模型、单视频/每日 token 上限、重试收窄（400 不再重试）、花费按真价分项显示。真机验证见 docs/evidence.md 第二十九节；设计取舍见工作区 docs/decisions-project-direction.md 同名小节。

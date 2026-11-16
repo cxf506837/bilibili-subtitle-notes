@@ -46,6 +46,17 @@
 <label>画面文字（PPT / 板书）</label>
 <label class="row"><input type="checkbox" id="visualEnabled" checked /> 自动截取稳定的画面并本地识别文字，作为理解辅助（识别在本机跑，不联网、不花钱；低分辨率视频会自动跳过）</label>
 
+<label>边看边整理</label>
+<label class="row"><input type="checkbox" id="autoNotes" /> 每看完一段就自动整理（默认关；关着就只在你点「总结这段 / 整理全片」时才花模型调用）</label>
+
+<label for="capVideo">单视频 token 上限</label>
+<input id="capVideo" type="number" min="0" step="1000" value="120000" />
+<div class="hint">到这个数就停下，剩下点「继续整理」放行一段；设 0 表示不限。默认 120000 token（约 1 小时视频，约 ¥0.2）。</div>
+
+<label for="capDay">每日 token 上限</label>
+<input id="capDay" type="number" min="0" step="10000" value="600000" />
+<div class="hint">跨天自动重置；设 0 表示不限。默认 600000 token。</div>
+
 <label for="goal">学习目标（可选）</label>
 <textarea id="goal" rows="3" placeholder="例如：三周内能独立用 DSH 跑通一个自动化任务；重点搞懂 skills、判据、回滚"></textarea>
 <div class="hint">只写进「学习包」（课程条里点「交给 agent」导出的那份），让 agent 知道该往哪裁；不填也能用。</div>

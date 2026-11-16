@@ -17,6 +17,10 @@
     // 有没有填 API Key：null=还不知道（storage 读回来之前别误报），没填时点「总结这段 / 整理全片」直接引到设置
     hasKey: null,
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, autoHidden: false, lastTime: 0,
+    // 花的是用户自己的钱：分项记 token（缓存命中便宜十倍），金额按真实价折算，别再按 1.5/M 平摊
+    tok: { in: 0, out: 0, hit: 0 }, dayTokens: 0, caps: { video: 120000, day: 600000 },
+    // 边看边整理默认关：不点就不花钱。第一次有段落被「看着看完」时才问一次，问完记住
+    autoNotes: false, autoAsked: false, budgetGrace: false,
     // 合集批量导出：running 防重入，cancel 让「停止导出」在下一 P 前生效
     batch: { running: false, cancel: false },
     // 整理全片：一键把还没笔记的块全排进队列；allPrev 记下动手前这些块的覆盖状态，停止时好还原
@@ -62,6 +66,9 @@
     '.bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px; font-size: 12px; }',
     '.acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 0 10px 8px; border-bottom: 1px solid var(--bnline); }',
     '.acts { position: relative; }',
+'.autobar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 10px 8px; padding: 7px 9px; font-size: 12px; line-height: 1.5; border: 1px solid var(--bnline); border-radius: 6px; background: var(--bnfill); }',
+'.autobar .at { flex: 1 1 100%; color: var(--bnmuted); }',
+'.autobar.hidden { display: none; }',
     '.more { display: none; position: absolute; top: 100%; right: 6px; z-index: 30; min-width: 132px; padding: 4px; background: var(--bnbg); border: 1px solid var(--bnline); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.14); }',
     '.more.open { display: flex; flex-direction: column; gap: 4px; }',
     '.more .btn { text-align: left; justify-content: flex-start; }',
@@ -252,6 +259,11 @@
     '<span class="plabel hidden" id="pLabel"></span>',
     '<span class="grow" id="statusText">初始化…</span>',
     '<span class="mono" id="cost"></span>',
+    '</div>',
+    '<div class="autobar hidden" id="autoBar">',
+    '<span class="at">边看边整理：每看一段就自动花一次模型调用（约 ¥0.002/段，1 小时视频约 ¥0.2）。不点就不花。</span>',
+    '<button class="btn sm accent" id="autoYes">边看边整理</button>',
+    '<button class="btn sm" id="autoNo">只在我点了才整理</button>',
     '</div>',
     '<div class="acts">',
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▸</button>',
@@ -1325,7 +1337,7 @@
     const sum = document.createElement('button');
     sum.className = 'btn sm';
     sum.textContent = '总结这段';
-    sum.title = '会照常调用模型，约 ' + Math.max(1, Math.round(count * 0.6)) + 'k token';
+    sum.title = '会照常调用模型，' + (BUD ? BUD.estimateText(count, '约 ') : '约 ' + Math.max(1, Math.round(count * 0.6)) + 'k token');
     sum.addEventListener('click', function () { forceBlocks(indexes); });
     const go = document.createElement('button');
     go.className = 'btn sm';
@@ -1367,13 +1379,13 @@
       const list = Array.isArray(blocks) ? blocks : [];
       const left = list.filter(function (b) { return b && b.noteIndex == null && !b.queued; }).length;
       if (!list.length || left <= 0) return null;
-      const k = Math.max(1, Math.round(left * 0.6));
+      const k = Math.max(1, Math.round(left * 1.0));
       return {
         title: '这个视频还没整理过',
         text: '全片 ' + list.length + ' 段。可以现在整理一遍，也可以先只看字幕——不花一分钱。',
         primary: '整理全片（' + left + ' 段）',
         secondary: '只导出字幕全文',
-        cost: '整理约 ' + k + 'k token ≈ ¥' + (k * 1000 / 1e6 * 1.5).toFixed(3) + '，用你自己的额度',
+        cost: '整理约 ' + k + 'k token ≈ ¥' + (k * 0.0023).toFixed(3) + '，用你自己的额度',
         todo: left,
       };
     },
@@ -1391,7 +1403,7 @@
       b.title = '点一下停止：当前这段会做完，剩下的还原回「未观看」';
     } else {
       const n = todo.length;
-      b.title = '把全片 ' + n + ' 段一次整理完（约 ' + Math.max(1, Math.round(n * 0.6)) + 'k token）。注意：没看过的段落也会写出来，等于剧透';
+      b.title = '把全片 ' + n + ' 段一次整理完（' + (BUD ? BUD.estimateText(n, '约 ') : '约 ' + Math.max(1, Math.round(n * 0.6)) + 'k token') + '）。注意：没看过的段落也会写出来，等于剧透';
     }
     b.classList.toggle('accent', !!state.allRun);
     syncMore();
@@ -1545,7 +1557,7 @@
         rs.className = 'btn sm';
         rs.textContent = '继续整理';
         rs.title = '上一次调用失败了；点这里重试剩下的 ' + state.queue.length + ' 段';
-        rs.addEventListener('click', function () { state.queueHold = false; runQueue(); });
+        rs.addEventListener('click', function () { state.budgetGrace = true; state.queueHold = false; runQueue(); });
         p.appendChild(rs);
       }
       frag.appendChild(p);
@@ -1968,7 +1980,7 @@
     if (!state.bvid) return;
     if (!state.meta || !state.meta.cid) return; // meta 还没解析出来：别写 "BVxxx:" 这种半截键
     dbPut(state.bvid + ':' + (state.meta ? state.meta.cid : ''), {
-      verdict: state.verdict, notes: state.notes, tokens: state.tokens,
+      verdict: state.verdict, notes: state.notes, tokens: state.tokens, tok: state.tok,
       sections: state.sections, savedAt: Date.now(),
     });
     syncSearchIndex();
@@ -2021,8 +2033,8 @@
     }
     if (saved.tokens) {
       state.tokens = saved.tokens;
-      state.cost = state.tokens / 1e6 * 1.5;
-      costEl.textContent = (state.tokens / 1000).toFixed(1) + 'k ≈ ¥' + state.cost.toFixed(3);
+      state.tok = saved.tok || { in: saved.tokens, out: 0, hit: 0 };
+      renderCost();
     }
     syncSearchIndex(); // 老笔记（这个功能之前攒的）也补进检索索引
     return state.notes.length;
@@ -2366,11 +2378,54 @@
     });
   }
 
+  // 钱的显示只有一个入口：价格在 src/budget.js，别在界面里再写一套汇率。
+  const BUD = window.BnBudget || null;
+  function costOfTok() {
+    if (BUD) return BUD.costOf({ in: state.tok.in, out: state.tok.out, hit: state.tok.hit });
+    return state.tokens / 1e6 * 1.5;
+  }
+  function renderCost() {
+    state.cost = costOfTok();
+    if (!state.tokens) { costEl.textContent = ''; costEl.title = ''; return; }
+    if (BUD) {
+      costEl.textContent = BUD.label(state.tok, state.notes.length) || '';
+      costEl.title = '输入 ' + state.tok.in + ' token（其中缓存命中 ' + state.tok.hit + '）+ 输出 ' + state.tok.out + ' token';
+      return;
+    }
+    costEl.textContent = (state.tokens / 1000).toFixed(1) + 'k ≈ ¥' + state.cost.toFixed(3);
+  }
   function addCost(usage) {
     if (!usage) return;
-    state.tokens += (usage.prompt_tokens || usage.input_tokens || 0) + (usage.completion_tokens || usage.output_tokens || 0);
-    state.cost = state.tokens / 1e6 * 1.5;
-    costEl.textContent = (state.tokens / 1000).toFixed(1) + 'k ≈ ¥' + state.cost.toFixed(3);
+    const u = BUD ? BUD.usageOf(usage) : {
+      in: (usage.prompt_tokens || usage.input_tokens || 0),
+      out: (usage.completion_tokens || usage.output_tokens || 0), hit: 0,
+    };
+    state.tok.in += u.in; state.tok.out += u.out; state.tok.hit += u.hit;
+    state.tokens += u.in + u.out;
+    state.dayTokens += u.in + u.out;
+    renderCost();
+    flushDayTokens();
+  }
+  // 当天花了多少：只用来给「每日上限」当闸，跨天自动换键（bntok:2026-11-16）
+  let daySaveTimer = 0;
+  function dayKey() { return BUD ? BUD.dayKey() : ''; }
+  function flushDayTokens() {
+    if (!dayKey()) return;
+    if (daySaveTimer) return;
+    daySaveTimer = setTimeout(function () {
+      daySaveTimer = 0;
+      const patch = {}; patch[dayKey()] = state.dayTokens;
+      try { chrome.storage.local.set(patch); } catch (e) {}
+    }, 1200);
+  }
+  // 上限拦住之后：说清停在哪、还能怎么继续（「继续整理」按钮本来就在）
+  function budgetStop(b) {
+    state.queueHold = true;
+    const cap = state.caps || {};
+    const hint = (b.reason === 'video')
+      ? '（单视频上限 ' + (BUD ? BUD.fmtTokens(cap.video) : cap.video) + ' token，可在设置里调大或设 0 关掉）'
+      : '（每日上限 ' + (BUD ? BUD.fmtTokens(cap.day) : cap.day) + ' token，可在设置里调大或设 0 关掉；明天自动重置）';
+    setStatus('warn', b.text + hint + '。点「继续整理」会再放一段；要整片跑完就去设置里调上限', '');
   }
 
   function statusLabel() {
@@ -2384,8 +2439,13 @@
     return base;
   }
 
-  // 可重试的失败：限流 / 网络 / 超时 / 5xx。Key 错了重试没有意义，直接报。
-  const RETRYABLE = { 'rate-limit': 1, network: 1, timeout: 1, http: 1 };
+  // 可重试的失败：限流 / 网络 / 超时 / 5xx。400 这类「重试一百次也一样」的不重试——每次重试都是全额计费。
+  const RETRYABLE = { 'rate-limit': 1, network: 1, timeout: 1 };
+  function retryable(res) {
+    if (!res) return false;
+    if (RETRYABLE[res.code]) return true;
+    return res.code === 'http' && Number(res.status) >= 500;
+  }
   const RETRY = { attempts: 3, baseMs: 2000, rateMs: 5000 };
 
   async function callWithRetry(payload) {
@@ -2394,7 +2454,7 @@
       const res = await callModel(payload);
       if (res && res.ok) return res;
       last = res || { ok: false, error: 'no-response' };
-      if (!RETRYABLE[last.code] || i === RETRY.attempts - 1) return last;
+      if (!retryable(last) || i === RETRY.attempts - 1) return last;
       const wait = (last.code === 'rate-limit' ? RETRY.rateMs : RETRY.baseMs) * (i + 1);
       const rest = state.queue.length;
       setStatus('warn', '排队中 · 等 ' + Math.round(wait / 1000) + 's' + (rest ? '（还有 ' + rest + ' 段）' : ''), last.error);
@@ -2447,7 +2507,7 @@
     for (let g = 0; g < groups; g++) {
       if (state.sectionTried[g]) continue;
       const tries = state.sectionTry[g] || 0;
-      if (tries >= 3) continue; // 同一节最多试 3 次（模型偶尔返回超长/非 JSON，不值得一直重试烧钱）
+      if (tries >= 2) continue; // 同一节最多试 2 次：失败多半是返回超长/非 JSON，再试还是白花钱
       const lo = g * per;
       const hi = lo + per;
       const items = [];
@@ -2480,6 +2540,13 @@
     const stale = function () { return seq !== bootSeq; };
     while (state.queue.length) {
       if (stale()) { state.busy = false; return; }
+      // 额度闸：到上限就停在这，别把用户的余额当无底洞
+      const over = BUD ? BUD.blocked(state.tokens, state.dayTokens, state.caps) : null;
+      if (over) {
+        // 用户点了「继续整理」就放行一段，之后继续按上限卡（不是一次放到底）
+        if (!state.budgetGrace) { budgetStop(over); state.busy = false; return; }
+        state.budgetGrace = false;
+      }
       const block = state.queue.shift();
       // 记下正在请求的这块：这时候再点「整理全片」，不能把它算成待整理，否则同一段会被写两遍
       state.curBlock = block;
@@ -2627,7 +2694,9 @@
     state.lastTime = t;
     if (added) {
       renderStream();
-      runQueue();
+      // 默认不自动花钱：先问一次；答过「只在我点了才整理」就一直不自动跑
+      if (state.autoNotes) runQueue();
+      else maybeAskAuto();
     } else if (Math.abs(t - (state.outlineAt || 0)) > 2) {
       state.outlineAt = t;
       markOutline();
@@ -2821,7 +2890,7 @@
   function snapshot() {
     return {
       meta: state.meta, sentences: state.sentences, blocks: state.blocks,
-      notes: state.notes, tokens: state.tokens, verdict: state.verdict, trackLan: state.trackLan, titleCheck: state.titleCheck,
+      notes: state.notes, tokens: state.tokens, tok: state.tok, verdict: state.verdict, trackLan: state.trackLan, titleCheck: state.titleCheck,
       covered: state.covered, readability: state.readability, sections: state.sections,
       away: { spans: state.away.spans, shown: state.away.shown },
     };
@@ -2843,6 +2912,7 @@
     state.blocks = snap.blocks;
     state.notes = snap.notes;
     state.tokens = snap.tokens;
+    state.tok = snap.tok || { in: snap.tokens || 0, out: 0, hit: 0 };
     state.verdict = snap.verdict;
     state.trackLan = snap.trackLan;
     state.titleCheck = snap.titleCheck || null;
@@ -2864,7 +2934,7 @@
     state.lastTick = null;
     linkNotes(snap.notes || []);
     if (state.notes.length) {
-      costEl.textContent = state.tokens ? (state.tokens / 1000).toFixed(1) + 'k ≈ ¥' + (state.tokens / 1e6 * 1.5).toFixed(3) : '';
+      renderCost();
       setStatus(state.verdict === 'stable' ? 'ok' : 'warn', statusLabel() + ' · 已恢复');
       state.emptyHint = '';
     } else {
@@ -2927,6 +2997,8 @@
     state.queue = [];
     state.queueHold = false;
     state.tokens = 0;
+    state.tok = { in: 0, out: 0, hit: 0 };
+    if ($('autoBar')) $('autoBar').classList.add('hidden');
     state.verdict = '';
     state.titleCheck = null;
     state.away.spans = [];
@@ -3472,6 +3544,45 @@
   $('btnExport').addEventListener('click', exportMarkdown);
   $('btnMulti').addEventListener('click', exportAllParts);
   $('btnAll').addEventListener('click', function () { if (state.allRun) stopAll(); else startAll(); });
+  // 默认不自动花钱：第一次有段落被「看着看完」时才问一次，答完记住（同一个浏览器不再问）
+  function autoAskKey() { return 'bn.autoAsked.v1'; }
+  function maybeAskAuto() {
+    if (state.autoNotes || state.autoAsked) return;
+    if (state.queueHold || state.busy) return;
+    if (state.hasKey === false) return; // 没填 Key 时先让他去填，别拿「边看边整理」再拦一道
+    const bar = $('autoBar');
+    if (!bar || !bar.classList.contains('hidden')) return;
+    bar.classList.remove('hidden');
+  }
+  function answerAuto(on) {
+    state.autoAsked = true;
+    state.autoNotes = !!on;
+    $('autoBar').classList.add('hidden');
+    try { chrome.storage.local.set({ 'bn.autoNotes': !!on }); } catch (e) {}
+    try { localStorage.setItem(autoAskKey(), '1'); } catch (e) {}
+    if (on) { setStatus('ok', '边看边整理已打开：每看完一段自动整理一次（可在设置里关掉）', ''); runQueue(); }
+    else setStatus('ok', '只在你点「总结这段」或「整理全片」时才调用模型', '');
+  }
+  $('autoYes').addEventListener('click', function () { answerAuto(true); });
+  $('autoNo').addEventListener('click', function () { answerAuto(false); });
+  // 自动开关与两个上限都放 storage：在设置页改完就生效，不用回来刷新页面
+  function loadSpendPrefs() {
+    const today = dayKey();
+    const keys = ['bn.autoNotes', 'bn.capVideo', 'bn.capDay'];
+    if (today) keys.push(today);
+    chrome.storage.local.get(keys, function (r) {
+      if (!r) return;
+      state.autoNotes = r['bn.autoNotes'] === true;
+      const cv = Number(r['bn.capVideo']);
+      const cd = Number(r['bn.capDay']);
+      if (isFinite(cv) && cv >= 0) state.caps.video = cv;
+      if (isFinite(cd) && cd >= 0) state.caps.day = cd;
+      state.dayTokens = today && Number(r[today]) > 0 ? Number(r[today]) : 0;
+      if (!state.autoAsked) {
+        try { state.autoAsked = localStorage.getItem(autoAskKey()) === '1'; } catch (e) {}
+      }
+    });
+  }
   $('btnMore').addEventListener('click', function (ev) {
     ev.stopPropagation();
     $('more').classList.toggle('open');
@@ -3540,18 +3651,27 @@
 
   // 先把默认宽度落到行内样式：只靠 CSS 默认值时，复制/粘贴或别的站点样式带偏就会撑满整页
   wrap.style.width = state.width + 'px';
-  chrome.storage.local.get(['bn.awayEnabled', 'bn.awaySeen', 'bn.visualEnabled', 'apiKey'], function (r) {
+  chrome.storage.local.get(['bn.awayEnabled', 'bn.awaySeen', 'bn.visualEnabled', 'apiKey', 'bn.autoNotes', 'bn.capVideo', 'bn.capDay'], function (r) {
     state.hasKey = !!(r && r['apiKey']);
     state.away.enabled = !(r && r['bn.awayEnabled'] === false);
     state.away.seen = (r && r['bn.awaySeen']) || {};
     state.visual.enabled = !(r && r['bn.visualEnabled'] === false);
     if (state.visual.enabled) startVisual(); else stopVisual();
+    state.autoNotes = r && r['bn.autoNotes'] === true;
+    const cv = Number(r && r['bn.capVideo']);
+    const cd = Number(r && r['bn.capDay']);
+    if (isFinite(cv) && cv >= 0) state.caps.video = cv;
+    if (isFinite(cd) && cd >= 0) state.caps.day = cd;
   });
+  loadSpendPrefs();
   if (chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(function (ch) {
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
       if (ch['apiKey']) state.hasKey = !!ch['apiKey'].newValue;
       if (Object.keys(ch).some(function (k) { return k.indexOf('bnstudy:') === 0; })) loadStudyStates();
+      if (ch['bn.autoNotes']) state.autoNotes = ch['bn.autoNotes'].newValue === true;
+      if (ch['bn.capVideo']) { const v = Number(ch['bn.capVideo'].newValue); if (isFinite(v) && v >= 0) state.caps.video = v; }
+      if (ch['bn.capDay']) { const v = Number(ch['bn.capDay'].newValue); if (isFinite(v) && v >= 0) state.caps.day = v; }
       if (ch['bn.visualEnabled']) {
         state.visual.enabled = ch['bn.visualEnabled'].newValue !== false;
         if (state.visual.enabled) startVisual();

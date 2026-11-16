@@ -1,6 +1,6 @@
 # B站字幕笔记
 
-[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 675 条离线测试 · MIT
+[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 686 条离线测试 · MIT
 
 跟播放头边看边写；每条结论都带**逐字引文 + 可点的时间**，点一下跳回原句。浏览器扩展（Edge / Chrome，MV3）。
 
@@ -20,7 +20,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、675 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、686 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 装（约 3 分钟）
 
@@ -68,7 +68,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 675 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 686 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```
@@ -83,3 +83,4 @@ MIT
 - 按钮不会挤成两行：这一行的「大纲 / 导出 / 整理全片 / 收起」是常用动作，设置、重新核对、画面字幕、导出全部 P、诊断都收在右边的「⋯」里；有可用的「重新核对」时 ⋯ 会变色提示。
 - 有课程的视频，面板顶部只有一张卡：上半是课程进度（合集 24 集 · 已看 2 集 + 继续），下半是掌握度一行（懂 5 · 半懂 11 · 没考 75 + 接着学）。掌握度默认收起，点一下才展开要重讲的那三个概念，展开状态会记住。
 - 不想等？面板上「整理全片（N 段）」一次把全片写完：没看过的段落也会写（等于剧透），会花掉对应 token；中途可以点「停止整理」，不会留下半截队列。
+- 不会自己偷偷花钱：默认只有你点「总结这段 / 整理全片」才调用模型。第一次看着看着走完一段时，它会问一句「边看边整理」，答过就记住；设置里能给单视频和每天各设一个 token 上限，到线就停（点「继续整理」放行一段）。状态条右边的花费按真实价算：输入 ¥2/M、缓存命中 ¥0.2/M、输出 ¥3/M，不再按 1.5 元/M 平摊。
