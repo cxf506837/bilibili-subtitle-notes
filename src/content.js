@@ -118,6 +118,12 @@
     '  background: transparent; color: inherit; font-size: 13px; outline: none; }',
     '.empty { padding: 22px 14px; text-align: left; opacity: .78; font-size: 12px; line-height: 1.85; }',
     '.empty .et { display: block; font-size: 13px; font-weight: 600; opacity: .95; margin-bottom: 6px; }',
+  '.empty.cta { opacity: 1; padding: 18px 14px; }',
+  '.empty.cta .ep { margin: 0 0 6px; font-size: 13px; line-height: 1.7; }',
+  '.empty.cta .ec { margin: 0 0 10px; font-size: 12px; opacity: .6; }',
+  '.empty.cta .eb { display: flex; gap: 8px; flex-wrap: wrap; }',
+  '.empty.cta .eb .btn { flex: 1 1 auto; }',
+  '.empty.cta .eh { margin: 10px 0 0; font-size: 12px; opacity: .6; line-height: 1.7; }',
     '.mono { font-variant-numeric: tabular-nums; opacity: .6; font-size: 11px; }',
     '.btn.sm { padding: 3px 8px; font-size: 11px; }',
     '.streamwrap { position: relative; flex: 1; min-height: 0; display: flex; }',
@@ -1278,6 +1284,20 @@
     label: function (n, running) { return running ? '停止整理' : '整理全片' + (n > 0 ? '（' + n + ' 段）' : ''); },
     doneText: function (n, total) { return '全片整理完了：这次写了 ' + n + ' 段' + (total > 0 ? '，全片共 ' + total + ' 段' : ''); },
     stopText: function (n) { return '已停止：还有 ' + n + ' 段没整理'; },
+    cta: function (blocks) {
+      const list = Array.isArray(blocks) ? blocks : [];
+      const left = list.filter(function (b) { return b && b.noteIndex == null && !b.queued; }).length;
+      if (!list.length || left <= 0) return null;
+      const k = Math.max(1, Math.round(left * 0.6));
+      return {
+        title: '这个视频还没整理过',
+        text: '全片 ' + list.length + ' 段。可以现在整理一遍，也可以先只看字幕——不花一分钱。',
+        primary: '整理全片（' + left + ' 段）',
+        secondary: '只导出字幕全文',
+        cost: '整理约 ' + k + 'k token ≈ ¥' + (k * 1000 / 1e6 * 1.5).toFixed(3) + '，用你自己的额度',
+        todo: left,
+      };
+    },
   };
 
   // 「整理全片」：不看也会写——用户点之前就该知道这是剧透 + 要花钱，所以文案把两件事都说出来。
@@ -1348,6 +1368,50 @@
     if (savePending || state.notes.length) { savePending = false; saveNow(); }
   }
 
+  // 空面板不是死路：给两个能立刻做的事（整理一遍 / 只导字幕），并把大概花多少钱写出来。
+  // 装完打开一个没整理过的视频，原来只有一行「共 N 句、M 段」，等于没有下一步。
+  function emptyCard() {
+    if (!Q.cta || !state.blocks.length) return null;
+    const c = Q.cta(state.blocks, { notes: state.notes.length });
+    if (!c) return null;
+    const box = document.createElement('div');
+    box.className = 'empty cta';
+    const t = document.createElement('span');
+    t.className = 'et';
+    t.textContent = c.title;
+    const pp = document.createElement('p');
+    pp.className = 'ep';
+    pp.textContent = c.text;
+    const cost = document.createElement('p');
+    cost.className = 'ec';
+    cost.textContent = c.cost;
+    const row = document.createElement('div');
+    row.className = 'eb';
+    const b1 = document.createElement('button');
+    b1.className = 'btn accent';
+    b1.textContent = c.primary;
+    b1.title = '没看过的段落也会写出来，等于剧透';
+    b1.addEventListener('click', function () { startAll(); });
+    const b2 = document.createElement('button');
+    b2.className = 'btn';
+    b2.textContent = c.secondary;
+    b2.title = '把这份字幕逐句导成 .md，不用 API Key，不花钱';
+    b2.addEventListener('click', exportMarkdown);
+    row.appendChild(b1);
+    row.appendChild(b2);
+    box.appendChild(t);
+    box.appendChild(pp);
+    box.appendChild(cost);
+    box.appendChild(row);
+    if (state.emptyHint) {
+      const hint = document.createElement('p');
+      hint.className = 'eh';
+      hint.innerHTML = state.emptyHint;
+      box.appendChild(hint);
+    }
+    return box;
+  }
+
   function renderStream() {
     // 补课视图接管笔记流（不弹窗、不另开页）：看完了再回正常流
     if (state.away.catchup) {
@@ -1405,6 +1469,12 @@
         p.appendChild(rs);
       }
       frag.appendChild(p);
+    }
+    // 大半个片子还没整理时，最上面先给「现在能做什么」：不填 Key 的人也能先拿字幕，
+    // 想一次看完的人点一下就整片整理。笔记过半之后就不再挡路了。
+    if (!state.allRun && state.notes.length * 2 < state.blocks.length) {
+      const card = emptyCard();
+      if (card) frag.insertBefore(card, frag.firstChild);
     }
     box.innerHTML = '';
     box.appendChild(frag);

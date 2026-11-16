@@ -52,3 +52,49 @@ test('doneText/stopText: 数字进句子', () => {
   assert.equal(Q.doneText(7), '全片整理完了：这次写了 7 段');
   assert.match(Q.stopText(3), /还有 3 段/);
 });
+
+test('cta: 全片都没笔记时给两个动作与花费', () => {
+  const c = Q.cta([block({}), block({}), block({})]);
+  assert.equal(c.title, '这个视频还没整理过');
+  assert.match(c.text, /全片 3 段/);
+  assert.equal(c.primary, '整理全片（3 段）');
+  assert.equal(c.secondary, '只导出字幕全文');
+  assert.match(c.cost, /2k token/);
+  assert.match(c.cost, /¥0\.003/);
+  assert.equal(c.todo, 3);
+});
+
+test('cta: 已经有笔记就不出现', () => {
+  assert.equal(Q.cta([block({ noteIndex: 0 })]), null);
+});
+
+test('cta: 正在排队的块不算待整理（否则文案数字虚高）', () => {
+  assert.equal(Q.cta([block({ queued: true })]), null);
+  const c = Q.cta([block({ queued: true }), block({})]);
+  assert.equal(c.todo, 1);
+  assert.equal(c.primary, '整理全片（1 段）');
+});
+
+test('cta: 空输入与脏数据不炸', () => {
+  assert.equal(Q.cta([]), null);
+  assert.equal(Q.cta(null), null);
+  assert.equal(Q.cta([null, 1, 'x']), null);
+});
+
+test('cta: 花费至少 1k，不说 ¥0.000', () => {
+  const c = Q.cta([block({})]);
+  assert.match(c.cost, /1k token/);
+  assert.doesNotMatch(c.cost, /0k token/);
+});
+
+test('cta: 已经有几段笔记时改口径，不谎称"还没整理过"', () => {
+  const c = Q.cta([block({ noteIndex: 0 }), block({}), block({})], { notes: 1 });
+  assert.equal(c.title, '还有 2 段没整理');
+  assert.match(c.text, /已经写了 1 段/);
+  assert.equal(c.todo, 2);
+});
+
+test('cta: notes 传脏数据当 0 处理', () => {
+  const c = Q.cta([block({})], { notes: 'x' });
+  assert.equal(c.title, '这个视频还没整理过');
+});
