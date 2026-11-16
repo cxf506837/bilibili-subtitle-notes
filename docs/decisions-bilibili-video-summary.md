@@ -955,3 +955,18 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 测试：course 48 → 50 条（前缀分组、section 优先、无前缀不硬拆、prefixOf 导出），新增 season.test.mjs 17 条（frontmatter、只含勾中集、段标题不重复、?t= 与 &t=、未导出原因、文件名清洗）；全量 458 条。
 
 踩坑：course.test.mjs 里原本已有 pc（多 P）、sc（单集）两个变量，我批量改名时把「单集」那两行也改成了 secCourse，Node 直接报 Cannot access 'secCourse' before initialization。批量替换后必须重跑一遍测试。
+
+## 2026-11-16 学习包（交给 agent，v1.4.0）
+
+用户要的是「把课程笔记交给自己的 agent，让它出图、拷打、记录掌握度」。做之前定死了三件事：
+
+1. **学习包是产品接口，不是日志**。spec 写成 `bn-study-pack/1`，字段含义、verdict 语义、版本规则都写进 `docs/agent-integration.md`，加字段不升版、删改语义升 /2。理由：agent 侧（阶段 C）要按这个格式写代码，格式漂一次就全废。
+2. **概念只给 id，引文和时间由本地取**。模型返回 `{name, def, anchors:[句子id]}`，`quote` / `t` / `url` 全由本地按句子 id 填。这是项目从第一天就守的规矩（引文不能由模型写），抽概念这一步也不破例。
+3. **抽概念按集缓存**。缓存键 `bnc:<cid>`，值里带「句子数:首sid:尾sid」当指纹，字幕变了才重抽。理由：同一批集反复导出是常态（用户会调目标、调勾选），每次重抽等于重复花同样的钱。
+
+两个实现细节值得记：
+
+- `src/study.js` 的 Markdown 分集标题一开始写成「label + 空格 + title」，而这个系列的 title 本身已含「S2-0」，于是出现「S2-0 S2-0 …」。修法是 title 已以 label 开头就不再拼。这类 bug 单测容易漏（单测用的是造出来的 title），真机拿真数据一跑就露。
+- `src/concepts.js` 的 UMD 尾必须是 `});`，写成 `})();` 会得到 `TypeError: (intermediate value)(...) is not a function`；而仓库 `package.json` 是 `"type":"module"`，`src/*.js` 在 node 里不能直接 `require`，测试统一用 `node:vm` 的 `createContext` + `runInContext`。
+
+真机（ugc_season 8719249，勾 S2-0、S2-1）：24 个概念 / 54 个时间锚点，JSON 23,209 字节，tokens 从 15,912 涨到 21,391（约 5.5k token）。数字与判断见 `docs/evidence.md` 第十四节。

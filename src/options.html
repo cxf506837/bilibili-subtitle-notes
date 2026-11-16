@@ -7,7 +7,7 @@
   body { font: 14px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 620px; margin: 40px auto; padding: 0 20px; color: #18191c; }
   h1 { font-size: 18px; }
   label { display: block; margin: 16px 0 4px; font-weight: 600; }
-  input, select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
   .hint { color: #888; font-size: 12px; margin-top: 4px; }
   button { margin-top: 20px; padding: 8px 18px; border: 0; border-radius: 6px; background: #00aeec; color: #fff; font-size: 14px; cursor: pointer; }
   #msg { margin-top: 12px; font-size: 13px; white-space: pre-wrap; }
@@ -46,6 +46,9 @@
 <label>画面文字（PPT / 板书）</label>
 <label class="row"><input type="checkbox" id="visualEnabled" checked /> 自动截取稳定的画面并本地识别文字，作为理解辅助（识别在本机跑，不联网、不花钱；低分辨率视频会自动跳过）</label>
 
+<label for="goal">学习目标（可选）</label>
+<textarea id="goal" rows="3" placeholder="例如：三周内能独立用 DSH 跑通一个自动化任务；重点搞懂 skills、判据、回滚"></textarea>
+<div class="hint">只写进「学习包」（课程条里点「交给 agent」导出的那份），让 agent 知道该往哪裁；不填也能用。</div>
 
 <button id="save">保存</button>
 <button id="test" style="background:#666">测试连接</button>

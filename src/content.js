@@ -377,6 +377,11 @@
       btn.disabled = !n;
       btn.classList.toggle('accent', n > 0);
     }
+    const pk = foot.querySelector('.cpack');
+    if (pk) {
+      pk.textContent = n ? '交给 agent（' + n + ' 集）' : '交给 agent';
+      pk.disabled = !n;
+    }
   }
 
   function renderCourseList() {
@@ -422,7 +427,7 @@
           ck.type = 'checkbox';
           ck.className = 'cpick';
           ck.checked = !!coursePick[ep.cid];
-          ck.title = '勾上就参与「导出选中」';
+          ck.title = '勾上就参与「导出选中」/「交给 agent」';
           ck.addEventListener('click', function (ev) {
             ev.stopPropagation();
             if (ck.checked) coursePick[ep.cid] = true; else delete coursePick[ep.cid];
@@ -466,9 +471,19 @@
         ev.stopPropagation();
         exportSelected();
       });
+      const packBtn = document.createElement('button');
+      packBtn.type = 'button';
+      packBtn.className = 'btn sm cpack';
+      packBtn.textContent = '交给 agent';
+      packBtn.title = '导出学习包（JSON + Markdown）：课程结构 + 笔记 + 概念卡，格式见 docs/agent-integration.md';
+      packBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        makeStudyPack();
+      });
       foot.appendChild(num);
       foot.appendChild(clear);
       foot.appendChild(exp);
+      foot.appendChild(packBtn);
       frag.appendChild(foot);
     }
     courseListEl.textContent = '';
@@ -476,7 +491,86 @@
     syncPickLabel();
   }
 
-  // 课程选择性导出：只对勾上的集取样过闸门，拼成一份 Markdown，交给 agent / Obsidian。
+  // 取样 + 过闸门：导出字幕、导出学习包走同一条路。
+  // 结尾再试一轮：B站 字幕接口会抖（同一 (aid,cid) 连取几次可能返回不同文件），一次不成立不代表这集没字幕。
+  async function collectSubs(picks, tag) {
+    const good = [];
+    const bad = [];
+    const courseUrl = 'https://www.bilibili.com/video/' + state.bvid;
+    for (let i = 0; i < picks.length; i++) {
+      if (state.batch.cancel) break;
+      const ep = picks[i];
+      setStatus('warn', tag + ' ' + (i + 1) + '/' + picks.length + ' · 第 ' + ep.index + ' 集 ' + String(ep.title).slice(0, 12), '每集取样 2~4 次过闸门');
+      let r = null;
+      try {
+        r = await G.gateSubtitle({ aid: ep.aid || (state.meta && state.meta.aid), cid: ep.cid, pageDur: ep.duration || 0 }, function (pg) {
+          if (pg && pg.state === 'probing') {
+            setStatus('warn', tag + ' ' + (i + 1) + '/' + picks.length + ' · 第 ' + ep.index + ' 集 取样 ' + pg.attempt + '/' + pg.total);
+          }
+        }, { attempts: 4, earlyVotes: 2 });
+      } catch (e) {
+        r = { verdict: 'api-error', reason: String(e).slice(0, 60) };
+      }
+      if (r && r.sentences && r.sentences.length && (r.verdict === 'stable' || r.verdict === 'single')) {
+        good.push({
+          index: ep.index, section: ep.section || '', title: ep.title,
+          bvid: ep.bvid || state.bvid, cid: ep.cid, url: ep.url || courseUrl, duration: ep.duration || 0,
+          verdict: r.verdict, votes: r.votes || 1,
+          trackLan: (r.track && r.track.lan) || '',
+          sentences: r.sentences,
+        });
+      } else {
+        bad.push({
+          index: ep.index, section: ep.section || '', title: ep.title,
+          bvid: ep.bvid || state.bvid,
+          verdict: (r && r.verdict) || 'no-attempt',
+          reason: (r && r.reason) || '',
+          cover: (r && r.stats && typeof r.stats.cover === 'number') ? Number(r.stats.cover.toFixed(3)) : null,
+          aid: ep.aid || '', cid: ep.cid, duration: ep.duration || 0, url: ep.url || courseUrl,
+        });
+      }
+    }
+    if (bad.length && !state.batch.cancel) {
+      const retry = bad.slice();
+      for (let i = 0; i < retry.length; i++) {
+        if (state.batch.cancel) break;
+        const f = retry[i];
+        setStatus('warn', '再试一次 ' + (i + 1) + '/' + retry.length + ' · 第 ' + f.index + ' 集 ' + String(f.title).slice(0, 12), '第一次没过闸门，重新取样');
+        let r2 = null;
+        try {
+          r2 = await G.gateSubtitle({ aid: f.aid || (state.meta && state.meta.aid), cid: f.cid, pageDur: f.duration || 0 }, null, { attempts: 5, earlyVotes: 2 });
+        } catch (e) {
+          r2 = null;
+        }
+        if (r2 && r2.sentences && r2.sentences.length && (r2.verdict === 'stable' || r2.verdict === 'single')) {
+          good.push({
+            index: f.index, section: f.section, title: f.title, bvid: f.bvid, cid: f.cid, url: f.url, duration: f.duration || 0,
+            verdict: r2.verdict, votes: r2.votes || 1,
+            trackLan: (r2.track && r2.track.lan) || '',
+            sentences: r2.sentences,
+          });
+          bad.splice(bad.indexOf(f), 1);
+        }
+      }
+      good.sort(function (x, y) { return Number(x.index) - Number(y.index); });
+    }
+    return { good: good, bad: bad };
+  }
+
+  // 用户按「S2-0 …」这种集号勾选时，文件名 / scope 用 S2 比用后台 section 名（例如「正片」）更贴近他选的东西。
+  function pickScope(picks, m) {
+    const secTitles = [];
+    const prefixes = [];
+    picks.forEach(function (ep) {
+      if (ep.section && secTitles.indexOf(ep.section) < 0) secTitles.push(ep.section);
+      const p = (window.BnCourse && window.BnCourse.prefixOf) ? window.BnCourse.prefixOf(ep.title) : '';
+      if (p && prefixes.indexOf(p) < 0) prefixes.push(p);
+    });
+    if (prefixes.length === 1) return prefixes[0];
+    if (secTitles.length === 1) return secTitles[0];
+    return picks.length === m.episodes.length ? '全部 ' + m.episodes.length + ' 集' : '选中 ' + picks.length + ' 集';
+  }
+
   async function exportSelected() {
     const m = courseModel;
     if (!m) return;
@@ -488,96 +582,24 @@
       return;
     }
     state.batch = { running: true, cancel: false };
-    const good = [];
-    const bad = [];
-    const courseUrl = 'https://www.bilibili.com/video/' + state.bvid;
+    let r = null;
     try {
-      for (let i = 0; i < picks.length; i++) {
-        if (state.batch.cancel) break;
-        const ep = picks[i];
-        setStatus('warn', '导出选中 ' + (i + 1) + '/' + picks.length + ' · 第 ' + ep.index + ' 集 ' + String(ep.title).slice(0, 12), '每集取样 2~4 次过闸门');
-        let r = null;
-        try {
-          r = await G.gateSubtitle({ aid: ep.aid || (state.meta && state.meta.aid), cid: ep.cid, pageDur: ep.duration || 0 }, function (pg) {
-            if (pg && pg.state === 'probing') {
-              setStatus('warn', '导出选中 ' + (i + 1) + '/' + picks.length + ' · 第 ' + ep.index + ' 集 取样 ' + pg.attempt + '/' + pg.total);
-            }
-          }, { attempts: 4, earlyVotes: 2 });
-        } catch (e) {
-          r = { verdict: 'api-error', reason: String(e).slice(0, 60) };
-        }
-        if (r && r.sentences && r.sentences.length && (r.verdict === 'stable' || r.verdict === 'single')) {
-          good.push({
-            index: ep.index,
-            section: ep.section || '',
-            title: ep.title,
-            url: ep.url || courseUrl,
-            verdict: r.verdict,
-            votes: r.votes || 1,
-            trackLan: (r.track && r.track.lan) || '',
-            sentences: r.sentences,
-          });
-        } else {
-          bad.push({
-            index: ep.index,
-            section: ep.section || '',
-            title: ep.title,
-            verdict: (r && r.verdict) || 'no-attempt',
-            reason: (r && r.reason) || '',
-            cover: (r && r.stats && typeof r.stats.cover === 'number') ? Number(r.stats.cover.toFixed(3)) : null,
-            aid: ep.aid || '', cid: ep.cid, duration: ep.duration || 0, url: ep.url || courseUrl,
-          });
-        }
-      }
+      r = await collectSubs(picks, '导出选中');
     } finally {
       state.batch.running = false;
     }
-    // 结尾再试一次没导出的集：B站 字幕接口本身会抖（同一 (aid,cid) 连取几次可能返回不同文件），
-    // 一次不成立不代表这一集没字幕，重取一轮能把瞬时的坏样本排掉。
-    if (bad.length && !state.batch.cancel) {
-      const retry = bad.slice();
-      for (let i = 0; i < retry.length; i++) {
-        if (state.batch.cancel) break;
-        const ep = retry[i];
-        setStatus('warn', '再试一次 ' + (i + 1) + '/' + retry.length + ' · 第 ' + ep.index + ' 集 ' + String(ep.title).slice(0, 12), '第一次没过闸门，重新取样');
-        let r2 = null;
-        try {
-          r2 = await G.gateSubtitle({ aid: ep.aid || (state.meta && state.meta.aid), cid: ep.cid, pageDur: ep.duration || 0 }, null, { attempts: 5, earlyVotes: 2 });
-        } catch (e) {
-          r2 = null;
-        }
-        if (r2 && r2.sentences && r2.sentences.length && (r2.verdict === 'stable' || r2.verdict === 'single')) {
-          good.push({
-            index: ep.index, section: ep.section, title: ep.title, url: ep.url,
-            verdict: r2.verdict, votes: r2.votes || 1,
-            trackLan: (r2.track && r2.track.lan) || '',
-            sentences: r2.sentences,
-          });
-          bad.splice(bad.indexOf(ep), 1);
-        }
-      }
-      good.sort(function (a, b) { return Number(a.index) - Number(b.index); });
-    }
+    const good = r.good;
+    const bad = r.bad;
     const stopped = !!state.batch.cancel;
     if (!good.length) {
       setStatus('bad', '选中这几集的字幕都没过闸门', '多半是没登录 B站，或这些集没有 AI 字幕');
       return;
     }
-    const secTitles = [];
-    const prefixes = [];
-    picks.forEach(function (ep) {
-      if (ep.section && secTitles.indexOf(ep.section) < 0) secTitles.push(ep.section);
-      const p = (window.BnCourse && window.BnCourse.prefixOf) ? window.BnCourse.prefixOf(ep.title) : '';
-      if (p && prefixes.indexOf(p) < 0) prefixes.push(p);
-    });
-    // 用户按「S2-0 …」这种集号勾选时，文件名/scope 用 S2 比用后台 section 名（例如「正片」）更贴近他选的东西。
-    const scope = prefixes.length === 1
-      ? prefixes[0]
-      : (secTitles.length === 1 ? secTitles[0] : picks.length === m.episodes.length ? '全部 ' + m.episodes.length + ' 集' : '选中 ' + picks.length + ' 集');
+    const scope = pickScope(picks, m);
     const text = window.BnBatch.seasonMarkdown(good, bad, {
       courseTitle: m.title || 'B站 课程',
       courseId: m.id || '',
-      url: courseUrl,
+      url: 'https://www.bilibili.com/video/' + state.bvid,
       total: picks.length,
       scope: scope,
     });
@@ -587,6 +609,140 @@
       (stopped ? '已停止：导出了 ' : '已导出 ') + good.length + '/' + picks.length + ' 集（' + stableN + ' 集两次取样一致）',
       bad.length ? '没导出的集和原因写在文件末尾' : '可以直接交给 agent / Obsidian');
   }
+
+  function storageGet(keys) {
+    return new Promise(function (resolve) {
+      try { chrome.storage.local.get(keys, function (v) { resolve(v || {}); }); } catch (e) { resolve({}); }
+    });
+  }
+  function storageSet(obj) {
+    try { chrome.storage.local.set(obj); } catch (e) {}
+  }
+
+  // 学习目标：全局一份（设置页里填），写进学习包，agent 才知道要往哪裁。
+  async function studyGoal() {
+    const v = await storageGet(['bn.goal']);
+    return String(v['bn.goal'] || '').trim();
+  }
+
+  // 一集的概念：每 120 句问一次模型；结果按「句子数 + 首尾 sid」缓存，重复导出不再花钱。
+  // 引文与时间戳一律由本地按 sid 取原句 —— 不让模型复述。
+  async function conceptsForEpisode(g, onProgress) {
+    if (!window.BnConcept) return [];
+    const sents = g.sentences || [];
+    const list = window.BnConcept.chunks(sents);
+    const hash = sents.length + ':' + (sents[0] ? sents[0].sid : 0) + ':' + (sents.length ? sents[sents.length - 1].sid : 0);
+    const key = 'bnc:' + g.cid;
+    const cached = await storageGet([key]);
+    const hit = cached[key];
+    if (hit && hit.v === hash && Array.isArray(hit.concepts)) return hit.concepts;
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      if (state.batch && state.batch.cancel) break;
+      if (onProgress) onProgress(i + 1, list.length);
+      const res = await callWithRetry(window.BnConcept.buildPrompt(list[i], g));
+      if (!res || !res.ok) break;
+      addCost(res.usage);
+      const one = window.BnConcept.normalize(res.content, list[i], g);
+      one.forEach(function (c) {
+        c.ep = g.index;
+        c.epLabel = window.BnConcept.epLabel(g);
+        c.epTitle = g.title;
+        c.url = g.url;
+        (c.anchors || []).forEach(function (a) {
+          a.ep = g.index; a.epLabel = c.epLabel; a.epTitle = g.title; a.url = g.url;
+        });
+        out.push(c);
+      });
+    }
+    if (out.length) {
+      const patch = {};
+      patch[key] = { v: hash, concepts: out, savedAt: Date.now() };
+      storageSet(patch);
+    }
+    return out;
+  }
+
+  // 学习包：课程结构 + 笔记 + 概念卡，导出 JSON（机器读）与 Markdown（人读）。
+  async function makeStudyPack() {
+    const m = courseModel;
+    if (!m) return;
+    const picks = pickedEps();
+    if (!picks.length) { setStatus('warn', '先在课程清单里勾选集数'); return; }
+    if (!window.BnStudy || !window.BnConcept) { setStatus('bad', '学习包脚本没加载', '重新加载扩展再试'); return; }
+    if (state.batch && state.batch.running) {
+      state.batch.cancel = true;
+      setStatus('warn', '正在停止…', '当前这一集跑完就停');
+      return;
+    }
+    state.batch = { running: true, cancel: false };
+    let good = [];
+    let bad = [];
+    const conceptsAll = [];
+    try {
+      const r = await collectSubs(picks, '学习包');
+      good = r.good;
+      bad = r.bad;
+      if (!good.length) {
+        setStatus('bad', '选中这几集的字幕都没过闸门', '多半是没登录 B站，或这些集没有 AI 字幕');
+        return;
+      }
+      const st = await storageGet(['apiKey']);
+      const hasKey = !!(st.apiKey && String(st.apiKey).trim());
+      if (!hasKey) {
+        setStatus('warn', '没填 API Key：学习包里只有字幕统计和笔记，没有概念卡', '设置 → 填 Key 后再点一次，概念会补上');
+      } else {
+        for (let i = 0; i < good.length; i++) {
+          if (state.batch.cancel) break;
+          const g = good[i];
+          setStatus('warn', '抽概念 ' + (i + 1) + '/' + good.length + ' · 第 ' + g.index + ' 集 ' + String(g.title).slice(0, 12), '一块 120 句；结果缓存，重复导出不花钱');
+          const cs = await conceptsForEpisode(g, function (k, total) {
+            setStatus('warn', '抽概念 ' + (i + 1) + '/' + good.length + ' · 第 ' + g.index + ' 集 第 ' + k + '/' + total + ' 块');
+          });
+          g.concepts = cs.map(function (c) { return c.name; });
+          cs.forEach(function (c) { conceptsAll.push(c); });
+        }
+      }
+      // 其它集的笔记：同源 IndexedDB 里存过就带上（键 bvid:cid）
+      for (let i = 0; i < good.length; i++) {
+        const g = good[i];
+        const rec = await dbGet(String(g.bvid) + ':' + String(g.cid));
+        const notes = (rec && Array.isArray(rec.notes)) ? rec.notes : [];
+        g.notes = notes.map(function (n) {
+          return {
+            start: Number(n.start) || 0,
+            one: String(n.oneThing || ''),
+            summary: String(n.blockSummary || ''),
+          };
+        });
+      }
+      const goal = await studyGoal();
+      const scope = pickScope(picks, m);
+      const pack = window.BnStudy.build({
+        course: {
+          id: m.id || '', title: m.title || 'B站 课程', kind: m.kind || '',
+          url: 'https://www.bilibili.com/video/' + state.bvid,
+          episodesTotal: m.episodes.length, durationSec: m.total || 0,
+        },
+        scope: scope,
+        goal: goal,
+        generatedAt: new Date().toISOString(),
+        episodes: good,
+        concepts: window.BnConcept.merge(conceptsAll),
+        failed: bad,
+      });
+      downloadMarkdown(pack.json, pack.baseName + '.json');
+      setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 600);
+      const n = pack.doc.counts;
+      const conceptMsg = n.concepts ? (n.concepts + ' 个概念 / ' + n.anchors + ' 个时间锚点') : '没抽概念';
+      setStatus(bad.length ? 'warn' : 'ok',
+        '学习包已导出 · ' + n.episodes + ' 集 · ' + n.notes + ' 条笔记 · ' + conceptMsg,
+        bad.length ? '没导出的集写在包末尾' : 'JSON 给 agent，Markdown 自己看；格式见 docs/agent-integration.md');
+    } finally {
+      state.batch.running = false;
+    }
+  }
+
   function openEpisode(i) {
     const m = courseModel;
     if (!m || !m.episodes[i]) return;
