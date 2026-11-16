@@ -427,3 +427,20 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 同一轮把「大纲」改成默认折叠：小节生成后它会在笔记流上方把同样的内容再列一遍，用户看起来像重复；现在初始 `class="outline hidden"`、按钮文案「大纲 ▸」，点开变「大纲 ▾」。真机验证：`outlineHidden:true, btn:"大纲 ▸"` → 点一下 → `outlineHidden:false, btn:"大纲 ▾"`。
 
 离线断言总数 656 → 665（`test/gate.test.mjs` 新增 9 条：切词、空标题、对得上/对不上、零命中提示、闸门放行但带 `hint`、标题对得上不提示）。
+
+## 二十、面板「设置」按钮点了没反应（2026-11-16 修，1.4.7）
+
+内容脚本里 `chrome.runtime.openOptionsPage` 是 **undefined**（真机 `typeof` 实测），旧代码写的是 `if (chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();` —— 条件永远不成立，所以面板「设置」按钮从上线起就是死键，点了什么都不发生，也没有任何报错。
+
+修法：内容脚本改发消息 `{type:"openOptions"}`，由后台 `chrome.runtime.openOptionsPage()` 代开。后台必须**先回包再开页**：实测先开页时消息口会先关掉，内容脚本只拿到 `The message port closed before a response was received.` 而看不到结果。
+
+顺带把「没填 Key」的死路堵上：`state.hasKey` 由 `chrome.storage.local` 的 apiKey 决定（null=还没读回来，别误报），没填时点「总结这段 / 整理全片」不再一头撞到后台报错，而是状态条写「没有填 API Key：点「设置」填一个；不想用 AI 的话点「导出」直接拿字幕全文」并直接打开设置页。
+
+| 验证 | 结果 |
+| --- | --- |
+| 全新 profile，内容脚本发 `{type:"diag"}` | `{"ok":true,"endpoint":"api.deepseek.com","model":"deepseek-chat","hasKey":false,"ocr":true}` |
+| 全新 profile，发 `{type:"openOptions"}` | 回 `{"ok":true}`，并真的开出 `chrome-extension://…/src/options.html` 标签页 |
+| 已登录 profile，清空 apiKey 后点「整理全片」 | 状态条变上面那句提示，`allRun=false`、队列 0；点之前按钮本来是「整理全片（45 段）」 |
+| 已登录 profile，点「设置」 | 旧构建下无反应（对照）；修复后用新 profile 复验通过 |
+
+注：`dist\edge-profile` 这个长期存在的测试 profile 后来出现「所有消息都 port closed」的异常，同一个包在新 profile 里一切正常，判定为该 profile 的陈旧扩展状态，不是代码问题。

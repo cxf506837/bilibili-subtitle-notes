@@ -12,6 +12,7 @@ const SRC = readFileSync(join(root, 'src/background.js'), 'utf8');
 function load({ cfg = {}, fetchImpl } = {}) {
   const store = Object.assign({ apiBase: 'https://api.deepseek.com/v1', apiKey: 'sk-test', model: 'deepseek-chat', maxTokens: 700 }, cfg);
   const calls = [];
+  const opened = [];
   const handler = { fn: null };
   const noop = () => {};
   const chain = () => ({ addListener: noop, removeListener: noop, hasListener: () => false });
@@ -21,6 +22,7 @@ function load({ cfg = {}, fetchImpl } = {}) {
       onInstalled: chain(),
       onStartup: chain(),
       getURL: (p) => 'chrome-extension://test/' + p,
+      openOptionsPage: () => { opened.push(1); },
       getManifest: () => ({ host_permissions: [] }),
       lastError: null,
       sendMessage: async () => ({ ok: false }),
@@ -52,7 +54,7 @@ function load({ cfg = {}, fetchImpl } = {}) {
     const ret = handler.fn(msg, {}, resolve);
     if (ret !== true && ret !== undefined) resolve(ret);
   });
-  return { send, calls };
+  return { send, calls, opened };
 }
 
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -135,6 +137,13 @@ function ok(name, cond, extra) {
   const { send, calls } = load({ cfg: { apiBase: 'https://api.openai.com/v1', model: 'gpt-4o-mini' }, fetchImpl: async () => okRes('hi') });
   await send({ type: 'chat', json: false, messages: [{ role: 'user', content: 'hi' }] });
   ok('OpenAI 端点不加 thinking', !has(calls[0].body, 'thinking'), JSON.stringify(calls[0].body));
+}
+
+// 9) 面板「设置」：内容脚本拿不到 openOptionsPage，必须由后台代开
+{
+  const { send, opened } = load({ fetchImpl: async () => okRes('') });
+  const r = await send({ type: 'openOptions' });
+  ok('openOptions 由后台真正执行', r && r.ok === true && opened.length === 1, JSON.stringify(r));
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');

@@ -12,6 +12,8 @@
     verdict: '', trackLan: '', status: 'init', detail: '',
     // 内容级提示：字幕正文与标题一个词都对不上（时长闸门挡不住「长度像但内容无关」）
     titleCheck: null,
+    // 有没有填 API Key：null=还不知道（storage 读回来之前别误报），没填时点「总结这段 / 整理全片」直接引到设置
+    hasKey: null,
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, autoHidden: false, lastTime: 0,
     // 合集批量导出：running 防重入，cancel 让「停止导出」在下一 P 前生效
     batch: { running: false, cancel: false },
@@ -1241,6 +1243,7 @@
 
   // 用户主动要求「把没看的那段也总结掉」：把这些块标成已覆盖并入队
   function forceBlocks(indexes) {
+    if (state.hasKey === false) return needKey();
     state.queueHold = false;
     indexes.forEach(function (i) {
       const b = state.blocks[i];
@@ -1282,6 +1285,7 @@
   }
 
   function startAll() {
+    if (state.hasKey === false) return needKey();
     // 正在请求的那一块不算「待整理」：它马上会自己出笔记
     const todo = Q.todo(state.blocks).filter(function (b) { return b !== state.curBlock; });
     if (!todo.length) return;
@@ -3265,9 +3269,17 @@
   $('btnDiag').addEventListener('click', copyDiag);
   $('btnVerify').addEventListener('click', function () { boot(true); });
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
-  $('btnOpt').addEventListener('click', function () {
-    if (chrome.runtime && chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();
-  });
+  // 内容脚本里 chrome.runtime.openOptionsPage 是 undefined（2026-11-16 真机实测），只能让后台代开。
+  // 之前那句 if (chrome.runtime.openOptionsPage) 永远不成立，面板「设置」按钮点了没反应。
+  function openSettings() {
+    try { if (chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'openOptions' }); } catch (e) {}
+  }
+  // 没填 Key 时两条 AI 入口都是死路：别跑到一半才报错，直接把话说清楚并打开设置
+  function needKey() {
+    setStatus('warn', '没有填 API Key：点「设置」填一个；不想用 AI 的话点「导出」直接拿字幕全文');
+    openSettings();
+  }
+  $('btnOpt').addEventListener('click', function () { openSettings(); });
   stream.addEventListener('scroll', function () {
     const nearBottom = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 60;
     if (nearBottom !== state.follow) { state.follow = nearBottom; updateJump(); }
@@ -3311,7 +3323,8 @@
 
   // 先把默认宽度落到行内样式：只靠 CSS 默认值时，复制/粘贴或别的站点样式带偏就会撑满整页
   wrap.style.width = state.width + 'px';
-  chrome.storage.local.get(['bn.awayEnabled', 'bn.awaySeen', 'bn.visualEnabled'], function (r) {
+  chrome.storage.local.get(['bn.awayEnabled', 'bn.awaySeen', 'bn.visualEnabled', 'apiKey'], function (r) {
+    state.hasKey = !!(r && r['apiKey']);
     state.away.enabled = !(r && r['bn.awayEnabled'] === false);
     state.away.seen = (r && r['bn.awaySeen']) || {};
     state.visual.enabled = !(r && r['bn.visualEnabled'] === false);
@@ -3320,6 +3333,7 @@
   if (chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener(function (ch) {
       if (ch['bn.awayEnabled']) state.away.enabled = ch['bn.awayEnabled'].newValue !== false;
+      if (ch['apiKey']) state.hasKey = !!ch['apiKey'].newValue;
       if (Object.keys(ch).some(function (k) { return k.indexOf('bnstudy:') === 0; })) loadStudyStates();
       if (ch['bn.visualEnabled']) {
         state.visual.enabled = ch['bn.visualEnabled'].newValue !== false;

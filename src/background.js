@@ -193,7 +193,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return { ok: true, endpoint: endpoint, model: cfg.model, hasKey: !!cfg.apiKey, ocr: ocr };
     })().then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e).slice(0, 200) }));
     return true;
-  }  if (msg && msg.type === 'chat') {
+  }
+  if (msg && msg.type === 'openOptions') {
+    // 内容脚本里没有 chrome.runtime.openOptionsPage（真机实测 undefined），面板的「设置」按钮只能走这里。
+    // 先回包再开页：实测先调用时消息口会先关掉，内容脚本只拿到「The message port closed」。
+    sendResponse({ ok: true });
+    try { chrome.runtime.openOptionsPage(); } catch (e) {}
+    return true;
+  }
+  if (msg && msg.type === 'chat') {
     chat(msg.payload || msg)
       .then(sendResponse)
       .catch((e) => sendResponse({ ok: false, code: 'exception', error: String(e).slice(0, 200) }));
