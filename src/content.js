@@ -61,6 +61,12 @@
     '.body { flex: 1; min-width: 0; display: flex; flex-direction: column; }',
     '.bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px; font-size: 12px; }',
     '.acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 0 10px 8px; border-bottom: 1px solid var(--bnline); }',
+    '.acts { position: relative; }',
+    '.more { display: none; position: absolute; top: 100%; right: 6px; z-index: 30; min-width: 132px; padding: 4px; background: var(--bnbg); border: 1px solid var(--bnline); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.14); }',
+    '.more.open { display: flex; flex-direction: column; gap: 4px; }',
+    '.more .btn { text-align: left; justify-content: flex-start; }',
+    '#btnMore { min-width: 34px; padding: 0 8px; letter-spacing: 1px; }',
+    '#btnMore.has { color: var(--bnaccentInk); border-color: var(--bnaccent); }',
     '.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bnmuted); flex: 0 0 7px; }',
     '.dot.ok { background: #2ecc71; } .dot.warn { background: #f0a020; } .dot.bad { background: #e74c3c; }',
     '.grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
@@ -246,12 +252,15 @@
     '<div class="acts">',
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▸</button>',
     '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
-    '<button class="btn hidden" id="btnMulti" title="这是合集 / 多 P：逐 P 取样并过闸门，把有字幕的那些拼成一份 Markdown。慢，会显示进度">导出全部 P</button>',
     '<button class="btn hidden" id="btnAll" title="把全片所有段落一次整理完">整理全片</button>',
-    '<button class="btn hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
-    '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">诊断</button>',
+    '<button class="btn" id="btnMore" title="更多：设置 / 重新核对字幕 / 画面字幕 / 导出全部 P / 诊断">⋯</button>',
+    '<div class="more" id="more">',
+    '<button class="btn sm" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
     '<button class="btn sm hidden" id="btnVerify" title="这份字幕只取到过一份、没交叉核对：再取一次，两次一致才算核过">再取样</button>',
-'<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
+    '<button class="btn sm hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
+    '<button class="btn sm hidden" id="btnMulti" title="这是合集 / 多 P：逐 P 取样并过闸门，把有字幕的那些拼成一份 Markdown。慢，会显示进度">导出全部 P</button>',
+    '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">诊断</button>',
+    '</div>',
     '<button class="btn accent" id="btnFold" title="收起右侧笔记面板">收起 ▸</button>',
     '<div class="foldonly foldbrand" id="foldBrand" title="展开右侧笔记面板">笔记</div>',
     '<div class="foldonly foldcount zero" id="foldCount" title="已生成的笔记条数">0</div>',
@@ -1010,11 +1019,27 @@
 
   // 单次取样 = 只取到过一份、没交叉核对。用户实测遇到过「内容其实是另一个视频的」，
   // 时长闸门拦不住这种；给一个显式的「再取样」，两次一致才算核过。
+  // 次要动作收进「⋯」：同一行挤 7 个按钮会换行，看着乱（1.4.10）
+  function syncMore() {
+    const box = $('more'); const b = $('btnMore');
+    if (!box || !b) return;
+    let any = false, urgent = false;
+    box.querySelectorAll('.btn').forEach(function (k) {
+      if (k.classList.contains('hidden')) return;
+      any = true;
+      if (k.id === 'btnVerify') urgent = true;
+    });
+    b.classList.toggle('hidden', !any);
+    b.classList.toggle('has', urgent);
+    if (!any) box.classList.remove('open');
+  }
+
   function syncVerifyBtn() {
     const b = $('btnVerify');
     if (!b) return;
     const show = !state.batch.running && !state.hard.active && (state.verdict === 'single' || state.fromCache);
     b.classList.toggle('hidden', !show);
+    syncMore();
     if (!show) return;
     // 缓存恢复出来的字幕可能是很久以前那一份（甚至内容不是这个视频的）：
     // 明说「重新核对」，点了就丢掉缓存重取一份对照，取不到会退回原来那份。
@@ -1315,6 +1340,7 @@
       b.title = '把全片 ' + n + ' 段一次整理完（约 ' + Math.max(1, Math.round(n * 0.6)) + 'k token）。注意：没看过的段落也会写出来，等于剧透';
     }
     b.classList.toggle('accent', !!state.allRun);
+    syncMore();
   }
 
   function startAll() {
@@ -2094,6 +2120,7 @@
     b.classList.toggle('hidden', !(hardSupported() && (usable || state.hard.active)));
     // 已经有画面字幕笔记时再点会从头重认（旧笔记会清掉），按钮文案要说清是「重新识别」
     b.textContent = state.hard.active ? '停止识别' : (state.verdict === 'hardsub' ? '重新识别' : '画面字幕');
+    syncMore();
   }
 
   function hardNote() {
@@ -2678,6 +2705,7 @@
     const m = state.meta || {};
     const n = Array.isArray(m.pageList) ? m.pageList.length : 0;
     b.classList.toggle('hidden', n < 2);
+    syncMore();
   }
 
   // 失败态一律「说人话 + 你能做什么」。术语（truncated/overflow/rejected）只留在 title 里给排查用。
@@ -3362,6 +3390,17 @@
   $('btnExport').addEventListener('click', exportMarkdown);
   $('btnMulti').addEventListener('click', exportAllParts);
   $('btnAll').addEventListener('click', function () { if (state.allRun) stopAll(); else startAll(); });
+  $('btnMore').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    $('more').classList.toggle('open');
+  });
+  $('more').addEventListener('click', function (ev) {
+    // 点完菜单里的任意一项就收起（事件仍冒泡给原来的按钮处理）
+    ev.stopPropagation();
+    if (ev.target && ev.target.closest && ev.target.closest('button')) $('more').classList.remove('open');
+  });
+  document.addEventListener('click', function () { $('more').classList.remove('open'); });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') $('more').classList.remove('open'); });
   $('btnDiag').addEventListener('click', copyDiag);
   $('btnVerify').addEventListener('click', function () { boot(true); });
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
