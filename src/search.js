@@ -114,7 +114,7 @@
   function renderCourses(all) {
     if (!CS) { coursesEl.hidden = true; return; }
     const studies = (S ? S.fromStorage(all) : []);
-    const rows = CS.list(all, studies, 4).filter(function (r) { return r.next || r.mastery; });
+    const rows = CS.list(all, studies, 3).filter(function (r) { return r.next || r.mastery; });
     if (!rows.length) { coursesEl.hidden = true; return; }
     coursesMeta.textContent = rows.length + ' 门课';
     let html = '';
@@ -122,8 +122,7 @@
       const done = !r.next;
       html += '<button class="crow' + (done ? ' done' : '') + '" data-url="' + esc(r.next ? r.next.url : '') + '" title="' + esc(r.title) + '">' +
         '<span class="crt">' + esc(r.title || '未命名课程') + '</span>' +
-        '<span class="crm">' + esc(CS.metaLine(r)) + '</span>' +
-        '<span class="crn">' + esc(CS.nextLine(r)) + '</span>' +
+        '<span class="crm">' + esc(CS.metaLine(r)) + (r.next ? ' · ' : '') + '<span class="crn">' + esc(CS.nextLine(r)) + '</span></span>' +
         '</button>';
     });
     courseRows.innerHTML = html;
