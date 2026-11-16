@@ -113,6 +113,7 @@
     '.note .chev { margin-left: auto; flex: 0 0 auto; font-size: 10px; opacity: .3; }',
     '.note.open .chev { opacity: .55; transform: rotate(90deg); }',
     '.note .chev { transition: transform .12s ease; }',
+  '.note .t:focus-visible, .note .h:focus-visible { outline: 2px solid var(--bnaccent); outline-offset: -2px; border-radius: 4px; }',
     '.note .one { font-size: 12px; opacity: .62; margin-top: 4px; }',
     '.note:not(.open) .pt, .note:not(.open) .vwrap, .note:not(.open) .one { display: none; }',
     '.pt { margin: 6px 0 0; }',
@@ -1183,7 +1184,16 @@
     const t = document.createElement('span');
     t.className = 't';
     t.textContent = fmt(note.start);
+    t.title = '跳到这一秒';
+    t.setAttribute('role', 'link');
+    t.tabIndex = 0;
     t.addEventListener('click', function () { seekTo(note.start); });
+    t.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      seekTo(note.start);
+    });
     const sum = document.createElement('span');
     sum.className = 'sum';
     sum.textContent = note.blockSummary || note.oneThing || '';
@@ -1193,12 +1203,27 @@
     chev.className = 'chev';
     chev.textContent = '\u25B6';
     h.appendChild(chev);
-    if (openNotes[String(note.start)]) el.classList.add('open');
-    h.addEventListener('click', function (ev) {
-      if (ev.target === t) return;
+    const openNow = !!openNotes[String(note.start)];
+    if (openNow) el.classList.add('open');
+    h.tabIndex = 0;
+    h.setAttribute('role', 'button');
+    h.setAttribute('aria-expanded', openNow ? 'true' : 'false');
+    h.setAttribute('aria-label', fmt(note.start) + ' ' + (note.blockSummary || note.oneThing || '这一段的笔记') + '（可展开/收起）');
+    function toggleOpen() {
       const k = String(note.start);
       if (openNotes[k]) delete openNotes[k]; else openNotes[k] = true;
-      el.classList.toggle('open', !!openNotes[k]);
+      const on = !!openNotes[k];
+      el.classList.toggle('open', on);
+      h.setAttribute('aria-expanded', on ? 'true' : 'false');
+    }
+    h.addEventListener('click', function (ev) {
+      if (ev.target === t) return;
+      toggleOpen();
+    });
+    h.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      toggleOpen();
     });
     if (note.hardsub) {
       const hs = document.createElement('span');

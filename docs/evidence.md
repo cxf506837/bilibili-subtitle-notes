@@ -546,3 +546,38 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 修法：`aidFromUrl()` 从 `/video/av<aid>` 拿到 aid，问一次 `x/web-interface/view?aid=` 换 `bvid`（带 `credentials: include`，结果按 aid 缓存），拿到之后整条链路照旧；换不到时才给一句人话「这个页面读不到 BV 号（番剧、课程、直播页暂时不支持），取不到字幕」。
 
 同一轮还修了探针自己的 bug：`extCtxOf()` 把主 frame 的 frameId 存在全局变量里，第二个 tab 就全都匹配不上（表现为满屏 `no-ctx`），改成按 session 记。
+
+## 二十六、页面覆盖边界与键盘可达（2026-11-16，1.4.14）
+
+### 哪些页面有面板，哪些本来就没有
+
+用真机（真 Edge + `--load-extension` + 1280×800）把六类页面各开一次，读 `#bn-root` 是否存在、有没有抛异常：
+
+| 页面 | 面板 | 状态条 | 异常 |
+| --- | --- | --- | --- |
+| `/video/BV1GyZYYNErW`（普通视频） | 有 | 「两次取样一致 · 本地缓存」 | 0 |
+| `/video/BV1BgH36DE7y/?p=2`（合集里的单集） | 有 | 「两次取样一致 · 本地缓存」，课程条在 | 0 |
+| `/bangumi/play/ep7702131`（番剧） | 无 | — | 0 |
+| `/live/6`（直播） | 无 | — | 0 |
+| 首页 | 无 | — | 0 |
+| `/space/2`（个人空间） | 无 | — | 0 |
+
+结论：`content_scripts.matches` 只写了 `https://www.bilibili.com/video/*`，所以番剧 / 直播 / 首页 / 空间**本来就没有面板**，这是设计不是 bug，而且这些页面上没有任何异常抛出（内容脚本压根没注入）。
+
+### 番剧能不能顺手支持？——结论是不做
+
+查过接口：`pgc/view/web/season?ep_id=<episode_id>` 的 `episodes[]` **是带 `bvid` / `aid` / `cid` / `duration` 的**（实测「小羊肖恩 第七季」ep7702131 → `bvid BV1nQWt6yE1W`、`aid 117585987242252`、`cid 43462886092`、`duration 421000`），所以技术上把 ep 映射成 bvid+cid 就能复用现有闸门。
+
+但 `x/player/v2` 用 `ep_id` 直接查会返回 `code -400`（必须给 aid+cid），而且拿 aid+cid 查回来的 `subtitles` 是**空数组**（该合集连取 3 集都是 0 条）。番剧在 B站 主要靠烧进画面的硬字幕和弹幕，要读就得做 ASR —— 而 ASR 是明确不做的（见 D12）。
+
+所以「番剧页没有面板」写进已知不足，不投入。哪天真要支持，得先证明某批番剧确实有可读的 CC 字幕。
+
+### 键盘可达：笔记能 Tab 到、能回车展开
+
+笔记原来只有鼠标能展开（`.h` 是 div，点一下切换），键盘用户和读屏用户拿不到。改法：
+
+- `.h` 加 `role="button"`、`tabIndex=0`、`aria-expanded`、`aria-label`（时间 + 摘要 + 「可展开/收起」），`Enter` / `Space` 切换；
+- 时间戳 `.t` 加 `role="link"`、`tabIndex=0`、`title="跳到这一秒"`，`Enter` / `Space` 跳转并且 `stopPropagation`（不许顺带展开）；
+- 焦点环用 `outline: 2px solid var(--bnaccent); outline-offset: -2px`，跟 B站 蓝一致。
+
+真机验证（BV1GyZYYNErW，119 条笔记）：`Enter` → `aria-expanded` false→true、`open:true`、焦点留在 `.h`；再按 `Space` → true→false；鼠标点 `.h` → 又 true；点第 3 条的时间戳「1:08」→ 视频从 0.1 秒跳到 68.9 秒、该笔记**没有**被展开。
