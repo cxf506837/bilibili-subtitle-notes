@@ -13,6 +13,8 @@
     tokens: 0, cost: 0, gateLog: [], queue: [], busy: false, width: 380, collapsed: false, autoHidden: false, lastTime: 0,
     // 合集批量导出：running 防重入，cancel 让「停止导出」在下一 P 前生效
     batch: { running: false, cancel: false },
+    // 整理全片：一键把还没笔记的块全排进队列；allPrev 记下动手前这些块的覆盖状态，停止时好还原
+    allRun: false, allPrev: null, allTodo: 0, curBlock: null,
     covered: [], lastTick: null, emptyHint: '', follow: true, queueHold: false,
     // 默认关：B站 AI 字幕几乎连续，判不出偏移；还要接管一次音频输出，不值当默认开
     // 走神补课：spans 记「你不在这段」的区间；shown 表示这次播放里已经弹过横幅
@@ -233,6 +235,7 @@
     '<button class="btn" id="btnOutline" title="展开 / 收起全片大纲">大纲 ▾</button>',
     '<button class="btn" id="btnExport" title="导出 Markdown：有笔记时导出笔记，没配 API Key 时导出字幕全文">导出</button>',
     '<button class="btn hidden" id="btnMulti" title="这是合集 / 多 P：逐 P 取样并过闸门，把有字幕的那些拼成一份 Markdown。慢，会显示进度">导出全部 P</button>',
+    '<button class="btn hidden" id="btnAll" title="把全片所有段落一次整理完">整理全片</button>',
     '<button class="btn hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
     '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">诊断</button>',
     '<button class="btn" id="btnOpt" title="API 设置（Base / 模型 / Key）">设置</button>',
@@ -1238,6 +1241,69 @@
     runQueue();
   }
 
+  // 队列编排是纯函数（src/queueplan.js），页面里注入顺序万一不对也别让按钮凭空消失
+  const Q = window.BnQueue || {
+    todo: function (blocks) {
+      return (Array.isArray(blocks) ? blocks : []).filter(function (b) { return b && b.noteIndex == null && !b.queued; });
+    },
+    label: function (n, running) { return running ? '停止整理' : '整理全片' + (n > 0 ? '（' + n + ' 段）' : ''); },
+    doneText: function (n, total) { return '全片整理完了：这次写了 ' + n + ' 段' + (total > 0 ? '，全片共 ' + total + ' 段' : ''); },
+    stopText: function (n) { return '已停止：还有 ' + n + ' 段没整理'; },
+  };
+
+  // 「整理全片」：不看也会写——用户点之前就该知道这是剧透 + 要花钱，所以文案把两件事都说出来。
+  function syncAllBtn() {
+    const b = $('btnAll');
+    if (!b) return;
+    const todo = Q.todo(state.blocks);
+    const show = state.allRun || (state.blocks.length > 0 && todo.length > 0 && !state.batch.running);
+    b.classList.toggle('hidden', !show);
+    b.textContent = Q.label(todo.length, state.allRun);
+    if (state.allRun) {
+      b.title = '点一下停止：当前这段会做完，剩下的还原回「未观看」';
+    } else {
+      const n = todo.length;
+      b.title = '把全片 ' + n + ' 段一次整理完（约 ' + Math.max(1, Math.round(n * 0.6)) + 'k token）。注意：没看过的段落也会写出来，等于剧透';
+    }
+    b.classList.toggle('accent', !!state.allRun);
+  }
+
+  function startAll() {
+    // 正在请求的那一块不算「待整理」：它马上会自己出笔记
+    const todo = Q.todo(state.blocks).filter(function (b) { return b !== state.curBlock; });
+    if (!todo.length) return;
+    state.queueHold = false;
+    state.allRun = true;
+    state.allTodo = todo.length;
+    state.allPrev = todo.map(function (b) { return { b: b, covered: !!b.covered, forced: !!b.forced }; });
+    todo.forEach(function (b) {
+      b.covered = true;
+      b.forced = true;
+      b.queued = true;
+      state.queue.push(b);
+    });
+    renderStream();
+    runQueue();
+  }
+
+  function stopAll() {
+    state.allRun = false;
+    state.queue.length = 0;
+    // 还没出笔记的块还原成动手前的样子：否则它们停在 covered=true、queued=true，
+    // 既不会再被播放覆盖重新排队，也不会显示「总结这段」按钮，等于从界面上消失。
+    (state.allPrev || []).forEach(function (it) {
+      const b = it.b;
+      if (!b || b.noteIndex != null) return;
+      b.covered = it.covered;
+      b.forced = it.forced;
+      b.queued = false;
+    });
+    state.allPrev = null;
+    const left = state.blocks.filter(function (b) { return b.noteIndex == null; }).length;
+    setStatus('warn', Q.stopText(left));
+    renderStream();
+  }
+
   // 长视频（120 块）里每出一块就整体重排一次 DOM + 写一次 IndexedDB 是 O(n²) 的活：
   // 屏幕上看不出差别，但 CPU 一直占着、视频开始掉帧。这里把「连着来的一串」合成一帧。
   let renderTimer = 0;
@@ -1316,6 +1382,7 @@
     renderOutline();
     updateJump();
     syncFold();
+    syncAllBtn();
   }
 
   // 提纲一律按时间排序：笔记可能是「补总结」时后补的，state.notes 的追加顺序不等于时间顺序
@@ -2231,6 +2298,8 @@
     while (state.queue.length) {
       if (stale()) { state.busy = false; return; }
       const block = state.queue.shift();
+      // 记下正在请求的这块：这时候再点「整理全片」，不能把它算成待整理，否则同一段会被写两遍
+      state.curBlock = block;
       const lines = S.toPromptLines(block, state.sentences);
       const prev = state.notes.length ? state.notes[state.notes.length - 1].oneThing : '';
       const rest = state.queue.length;
@@ -2248,6 +2317,7 @@
       if (!res.ok) {
         // 重试用尽：把这块放回队首，别静默吞掉（用户点「再试一次」或稍后自动继续都能补上）
         state.queue.unshift(block);
+        state.curBlock = null;
         state.queueHold = true;
         if (res.code === 'no-key') {
           // 没填 Key 不是「故障」：字幕已经拿稳了，告诉他能直接把它导出去，而不是让他以为产品坏了。
@@ -2260,6 +2330,18 @@
         return;
       }
       addCost(res.usage);
+      // 同一段已经有笔记了（比如停止后重来、或两次点击叠在一起）：不再写第二条，直接指向已有那条
+      let dupAt = -1;
+      for (let di = 0; di < state.notes.length; di++) {
+        const dn = state.notes[di];
+        if (dn && Math.abs(Number(dn.start) - block.start) < 0.01) { dupAt = di; break; }
+      }
+      if (dupAt >= 0) {
+        block.noteIndex = dupAt;
+        state.curBlock = null;
+        scheduleRender();
+        continue;
+      }
       const v = S.validate(res.content, lines, state.sentences, block.visual, { maxPoints });
       const note = {
         start: block.start, end: block.end, sids: block.sids,
@@ -2272,6 +2354,7 @@
       // 你不在的时候生成的，回来打个淡标记。用户自己点「总结这段」补的，不算「你不在时记的」
       if (sp && !block.forced) note.away = sp.reason;
       block.noteIndex = state.notes.length;
+      state.curBlock = null;
       state.notes.push(note);
       scheduleRender(); // 长视频里不要每块都整体重排一次
       refreshAwayBanner();
@@ -2285,6 +2368,14 @@
     renderStream();
     flushSave();
     state.busy = false;
+    if (state.allRun) {
+      // 中途失败会走上面的 return（queueHold 接管），所以能到这里就是真跑完了
+      const done = state.allTodo;
+      state.allRun = false;
+      state.allPrev = null;
+      setStatus('ok', Q.doneText(done, state.blocks.length));
+      renderStream();
+    }
   }
 
   // ---- 只总结真正播放过的区间：forward 跳转不产生覆盖，被跳过的那段画成占位条 ----
@@ -3146,6 +3237,7 @@
   $('btnOutline').addEventListener('click', function () { outline.classList.toggle('hidden'); });
   $('btnExport').addEventListener('click', exportMarkdown);
   $('btnMulti').addEventListener('click', exportAllParts);
+  $('btnAll').addEventListener('click', function () { if (state.allRun) stopAll(); else startAll(); });
   $('btnDiag').addEventListener('click', copyDiag);
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
   $('btnOpt').addEventListener('click', function () {
