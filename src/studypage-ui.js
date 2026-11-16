@@ -160,16 +160,49 @@
         if (item.cross && nEps > 1) meta.appendChild(el('span', 'badge cross', '跨 ' + nEps + ' 集'));
         if (item.suspect) meta.appendChild(el('span', 'badge suspect', '只在这集出现'));
         card.appendChild(meta);
-        (item.anchors || []).slice(0, 3).forEach(function (a) {
+        // 第一条引文直接铺开（扫一眼就知道讲了什么），其余的收进「出现在 N 集 · M 处」。
+        // 一个概念在整门课里出现在哪几集第几秒，才是「知识点连起来」真正要看的东西。
+        const occ = P.occSummary(item);
+        if (occ.count) {
+          const first = occ.list[0];
           const qd = el('div', 'quote');
-          const t = el('a', 't', CV.fmtClock(a.t));
-          t.href = a.url ? CV.withT(a.url, a.t) : '#';
+          const t = el('a', 't', CV.fmtClock(first.t));
+          t.href = first.url ? CV.withT(first.url, first.t) : '#';
           t.target = '_blank';
           t.rel = 'noopener';
+          if (occ.count > 1) t.title = '第 1 处（共 ' + occ.count + ' 处）';
           qd.appendChild(t);
-          qd.appendChild(document.createTextNode(' ' + (a.quote || '')));
+          qd.appendChild(document.createTextNode(' ' + (first.quote || '')));
           card.appendChild(qd);
-        });
+          if (occ.count > 1) {
+            const label = occ.eps > 1 ? ('出现在 ' + occ.eps + ' 集 · ' + occ.count + ' 处') : ('这一集讲了 ' + occ.count + ' 处');
+            const btn = el('button', 'occBtn', label);
+            btn.type = 'button';
+            btn.setAttribute('aria-expanded', 'false');
+            const more = el('div', 'occ hidden');
+            occ.list.forEach(function (a) {
+              const row = el('div', 'occRow');
+              const lbl = el('span', 'lbl', a.label);
+              if (a.title) lbl.title = a.title;
+              row.appendChild(lbl);
+              const tk = el('a', 't', CV.fmtClock(a.t));
+              tk.href = a.url ? CV.withT(a.url, a.t) : '#';
+              tk.target = '_blank';
+              tk.rel = 'noopener';
+              row.appendChild(tk);
+              row.appendChild(el('span', 'q', a.quote || ''));
+              more.appendChild(row);
+            });
+            btn.onclick = function () {
+              const nowHidden = more.classList.toggle('hidden');
+              const open = !nowHidden;
+              btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+              btn.textContent = open ? '收起' : label;
+            };
+            card.appendChild(btn);
+            card.appendChild(more);
+          }
+        }
         box.appendChild(card);
       });
     });

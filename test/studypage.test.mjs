@@ -86,5 +86,31 @@ ok('多词有一项不中就空', P.filterGroups(groups, 'git agent').length ===
 ok('被过滤空的分组不返回', P.filterGroups(groups, 'agent').every(g => g.items.length > 0));
 ok('对 null 安全', P.filterGroups(null, 'x').length === 0);
 
+// —— 一个概念在整门课里的所有出现处（学习页「出现在 N 集 · M 处」） ——
+const conceptA = { name: 'harness', anchors: [
+  { ep: 2, t: 300, epLabel: 'S2-1', epTitle: 'S2-1 别再手动点', quote: '第二集的引文', url: 'https://www.bilibili.com/video/BV2' },
+  { ep: 1, t: 128, epLabel: 'S1-0', quote: '最早的引文', url: 'https://www.bilibili.com/video/BV1' },
+  { ep: 1, t: 130, quote: '差 2 秒，算同一处的重复' },
+  { ep: 1, t: 200, quote: '差 70 秒，是另一处' },
+  { ep: 2, t: 'x', quote: '没有时间，丢掉' },
+  { ep: 0, t: 10, quote: '没有集号，丢掉' },
+  null,
+] };
+const occA = P.occurrences(conceptA);
+ok('出现处按集再按时间排', occA.map(x => x.ep + '@' + x.t).join(',') === '1@128,1@200,2@300', occA);
+ok('同集 3 秒内合并成一处', occA.length === 3);
+ok('合并时保留先到的那条引文', occA[0].quote === '最早的引文');
+ok('缺 t / 缺集号的锚点被丢掉', occA.every(x => typeof x.t === 'number' && x.ep > 0));
+ok('集标签沿用锚点上的 epLabel', occA[2].label === 'S2-1');
+const occNoLabel = P.occurrences({ anchors: [{ ep: 7, t: 5 }] });
+ok('没有标签时兜底「第 N 集」', occNoLabel[0].label === '第 7 集');
+const sumA = P.occSummary(conceptA);
+ok('统计处数', sumA.count === 3);
+ok('统计跨几集', sumA.eps === 2);
+const soloSum = P.occSummary({ anchors: [{ ep: 1, t: 5 }] });
+ok('只有一处的概念不显示「出现在」', soloSum.count === 1 && soloSum.eps === 1);
+ok('没有锚点时是 0 处', P.occSummary({}).count === 0);
+ok('对 null 安全', P.occurrences(null).length === 0 && P.occSummary(null).count === 0);
+
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

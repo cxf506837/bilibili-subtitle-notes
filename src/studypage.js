@@ -116,6 +116,45 @@
     };
   }
 
+  // 一个概念在整门课里的所有出现处（同一集里相隔 3 秒内的重复锚点算一处）。
+  // 学习页拿它做「出现在 3 集 · 6 处」的展开：每个概念都能顺着引文跳回 B站 那一秒。
+  const OCC_GAP = 3;
+  function occurrences(item) {
+    const anchors = Array.isArray(item && item.anchors) ? item.anchors : [];
+    const rows = [];
+    anchors.forEach(function (a) {
+      if (!a || typeof a.t !== 'number' || !(Number(a.ep) > 0)) return;
+      const ep = Number(a.ep);
+      rows.push({
+        ep: ep, t: Number(a.t),
+        label: str(a.epLabel || (item && item.epLabel) || ('第 ' + ep + ' 集')),
+        title: str(a.epTitle || ''),
+        quote: str(a.quote || ''),
+        url: str(a.url || ''),
+      });
+    });
+    rows.sort(function (x, y) { return x.ep - y.ep || x.t - y.t; });
+    const out = [];
+    rows.forEach(function (a) {
+      const last = out[out.length - 1];
+      if (last && last.ep === a.ep && Math.abs(last.t - a.t) < OCC_GAP) {
+        if (!last.quote && a.quote) last.quote = a.quote;
+        if (!last.title && a.title) last.title = a.title;
+        if (!last.url && a.url) last.url = a.url;
+        return;
+      }
+      out.push(a);
+    });
+    return out;
+  }
+
+  function occSummary(item) {
+    const list = occurrences(item);
+    const eps = [];
+    list.forEach(function (a) { if (eps.indexOf(a.ep) < 0) eps.push(a.ep); });
+    return { count: list.length, eps: eps.length, list: list };
+  }
+
   function tokens(q) {
     return str(q).toLowerCase().split(/\s+/).filter(Boolean);
   }
@@ -141,6 +180,6 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups,
+    filterGroups: filterGroups, occurrences: occurrences, occSummary: occSummary,
   };
 });
