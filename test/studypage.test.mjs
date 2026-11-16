@@ -140,5 +140,33 @@ ok('cross 不改原数组', all3[0].items.length === 2);
 ok('空输入安全', P.filterByView(null, 'cross', null).length === 0 && P.filterByView([], 'unwatched', null).length === 0);
 ok('未知视角当 all', P.filterByView(all3, 'x', [1]).length === 3);
 
+// —— 今天先看哪几个（半懂优先、跨集加权、suspect 降权）——
+function card(name, extra) {
+  const c = { name: name, anchors: [{ ep: 1, t: 10, epLabel: 'S1-0' }], eps: [1], cross: false, suspect: false, status: '' };
+  for (const k in (extra || {})) c[k] = extra[k];
+  return c;
+}
+const rq = P.reviewQueue([
+  card('懂了的概念', { status: 'understood' }),
+  card('半懂的概念', { status: 'shaky' }),
+  card('没考过普通', { status: '' }),
+  card('没考过跨集', { status: '', cross: true, eps: [1, 4] }),
+  card('没考过但可疑', { status: '', suspect: true }),
+], { limit: 9 });
+ok('半懂排第一', rq[0].name === '半懂的概念');
+ok('跨集的没考过排在普通没考过前面', rq.findIndex(function (x) { return x.name === '没考过跨集'; }) < rq.findIndex(function (x) { return x.name === '没考过普通'; }));
+ok('可疑的排在同分的普通没考过后面', rq.findIndex(function (x) { return x.name === '没考过但可疑'; }) > rq.findIndex(function (x) { return x.name === '没考过普通'; }));
+ok('懂了排最后', rq[rq.length - 1].name === '懂了的概念');
+ok('理由写清楚', rq[0].reason.indexOf('半懂') === 0 && rq.find(function (x) { return x.name === '没考过跨集'; }).reason.indexOf('跨 2 集') > 0);
+ok('limit 生效', P.reviewQueue([card('a'), card('b'), card('c')], { limit: 2 }).length === 2);
+ok('默认 6 个', P.reviewQueue(new Array(20).fill(0).map(function (_, i) { return card('c' + i); })).length === 6);
+ok('没有锚点的概念不进来', P.reviewQueue([{ name: 'x', anchors: [] }]).length === 0);
+ok('名字空的不进来', P.reviewQueue([{ name: ' ', anchors: [{ ep: 1, t: 5 }] }]).length === 0);
+ok('空输入安全', P.reviewQueue(null).length === 0 && P.reviewQueue([]).length === 0);
+const rqOne = P.reviewQueue([card('带标签', { anchors: [{ ep: 3, t: 75, epLabel: 'S2-1' }] })]);
+ok('带出集标签与秒数', rqOne[0].ep === 3 && rqOne[0].t === 75 && rqOne[0].epLabel === 'S2-1');
+const rqNoLabel = P.reviewQueue([card('无标签', { anchors: [{ ep: 7, t: 5 }] })]);
+ok('缺集标签兜底「第 N 集」', rqNoLabel[0].epLabel === '第 7 集');
+
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

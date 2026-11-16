@@ -305,6 +305,54 @@
     box.appendChild(el('div', 'when', when));
   }
 
+  // 右栏「今天先看这几个」：把合并后的概念列表交给 P.reviewQueue 排序，点一行就地播。
+  function renderReview(course, grouped) {
+    const box = $('review');
+    if (!box) return;
+    box.innerHTML = '';
+    const cids = P.cidsOf(course);
+    let g = grouped;
+    if (!g && cids.length) {
+      const collected = CV.collect(ALL, cids);
+      if (collected.length) {
+        g = CV.group(collected, {
+          keyOf: C.conceptKey,
+          merge: C.merge,
+          titles: ((course && course.episodes) || []).map(function (e) { return e.title || ''; }),
+          mastery: statusMap(ALL, course && course.id),
+        });
+      }
+    }
+    const qs = P.reviewQueue(g ? g.list : [], { limit: 6 });
+    if (!qs.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const head = el('div', 'rhead');
+    head.innerHTML = '<b>今天先看这几个</b> · 半懂优先，跨集的往前排';
+    box.appendChild(head);
+    qs.forEach(function (it) {
+      const row = el('button', 'rrow');
+      row.type = 'button';
+      const left = el('span');
+      left.style.flex = '1';
+      left.style.minWidth = '0';
+      const nm = el('span', 'rname', it.name);
+      nm.style.display = 'block';
+      const why = el('span', 'rwhy', it.reason);
+      left.appendChild(nm);
+      left.appendChild(why);
+      row.appendChild(left);
+      row.appendChild(el('span', 'rmeta', it.epLabel + ' · ' + CV.fmtClock(it.t)));
+      row.title = '回去听这一段：' + it.epLabel + ' ' + CV.fmtClock(it.t);
+      row.onclick = function () { playHere(it.ep, it.t, it.name, epUrl(EPMAP[Number(it.ep)] || {}, it.t)); };
+      box.appendChild(row);
+    });
+    const m = P.masteryOf(ALL, course && course.id);
+    const foot = el('div', 'rfoot', m.total
+      ? '依据 agent 这次拷打的结果（' + (m.updated_at || '').replace('T', ' ').slice(0, 16) + '）；再考一次，这张卡会跟着变。'
+      : '还没导入掌握度：现在按「跨集 / 锚点多」挑，导入后会按懂没懂重排。');
+    box.appendChild(foot);
+  }
+
   function render() {
     const list = P.courses(ALL);
     const course = P.pick(list, courseId);
@@ -327,6 +375,7 @@
     renderEps(course);
     renderGroups(course);
     renderMastery(course);
+    renderReview(course);
   }
 
   function load() {

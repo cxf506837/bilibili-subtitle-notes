@@ -116,6 +116,42 @@
     };
   }
 
+  // 今天先看哪几个：拿到「合并后的概念列表」（CV.group(...).list，每项带 status/cross/suspect/anchors）
+  // 之后按「最接近忘掉的最先看」排序。纯函数，now 只为将来加时间衰减留口子。
+  //   shaky（半懂）   200  —— 差一点就会，回看收益最高
+  //   unknown / ''    100  —— 没考过，先看一眼也值
+  //   understood       40  —— 懂了，排最后；只有前面不够 6 个时才露头
+  //   跨集 +12、锚点多 +1/处（封顶 +10）、只在一集且和集标题没字面重合（suspect）−15
+  function reviewQueue(list, opts) {
+    const o = opts || {};
+    const limit = Math.max(1, num(o.limit) || 6);
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach(function (c) {
+      if (!c) return;
+      const name = str(c.name).trim();
+      if (!name) return;
+      const anchors = Array.isArray(c.anchors) ? c.anchors : [];
+      if (!anchors.length) return;
+      const status = str(c.status);
+      let score = status === 'shaky' ? 200 : status === 'understood' ? 40 : 100;
+      if (c.cross) score += 12;
+      if (c.suspect) score -= 15;
+      score += Math.min(10, anchors.length);
+      const reason = status === 'shaky' ? '半懂——最容易忘'
+        : status === 'understood' ? '已经懂了，隔几天回看'
+          : (c.cross ? '没考过，而且跨 ' + (Array.isArray(c.eps) ? c.eps.length : 0) + ' 集' : '还没考过');
+      const a = anchors[0];
+      out.push({
+        name: name, status: status, score: score, reason: reason,
+        ep: num(a && a.ep), t: num(a && a.t),
+        epLabel: str(a && a.epLabel) || ('第 ' + num(a && a.ep) + ' 集'),
+        cross: !!c.cross,
+      });
+    });
+    out.sort(function (a, b) { return (b.score - a.score) || (a.ep - b.ep) || (a.t - b.t); });
+    return out.slice(0, limit);
+  }
+
   // 内嵌播放器的地址：只放 B站 官方 player.html 需要的参数（bvid 必有，cid/page 有才带，t 取整）。
   // 单独拎成纯函数，是因为「参数拼错」在真机上只表现为「画面不动」，日志里看不出来。
   function playerSrc(ep, t) {
@@ -213,6 +249,6 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups, filterByView: filterByView, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
+    filterGroups: filterGroups, filterByView: filterByView, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });
