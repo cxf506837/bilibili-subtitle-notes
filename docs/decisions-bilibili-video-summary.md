@@ -936,3 +936,22 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 - 进度存在 `chrome.storage.local` 的 `bnp:<cid>`，`timeupdate` 每 5 秒最多写一次。没放 IndexedDB：换页面/换 P 时内容脚本可能还没开库就要读。
 - UI 是两行表头（课程名 / 集数·总时长·已看几集 + 「继续」），点开是集清单；点一集如果就是这个视频就 seek，否则 `location.href` 跳走。
 - 测试：`test/course.test.mjs` 42 条（合集/多 P/单集、URL 拼参、时长格式、进度阈值、继续上次的回绕），全量 433 条。
+
+
+## 2026-11-16 课程选择性导出（只导 S1 / S2）
+
+需求来自用户原话：「我感觉可以加批量，选择性导出，比如这个系列是分为 s1 和 s2，我只想导出 s2，然后交给 dsh 深入学习」。
+
+做法：
+- gate.parseSeason 给每一集补 aid / section / sectionIndex（B站 合集接口 sections[].episodes[] 带这几个字段）。
+- course.js 加 prefixOf(title)（正则取行首 S1/S2 这类集号）与 groupSections()：section 标题多于一个就按 section 分组，否则按集号前缀分组（前缀去重后多于一个、且命中 60% 以上集数才算），都不成立就一组。
+- batch.js 加 seasonMarkdown / seasonFileName：按 section 打 ## 标题，每集一个 ### 第 N 集，每句一行可点回原句，末尾列「未导出的集」及原因；文件名形如「【从零开始的 AI 学习】（S2 · 9 集）.md」。
+- content.js 课程清单改成可勾选（每行前面 checkbox，分组头有全选，底部显示已选几集 + 清空 + 导出选中），导出走 exportSelected()：逐集取样过闸门，取到就继续，中途可停。
+
+两条实测得到的判断：
+1. 一次导出 9 集，第一次只有 4 集过闸门（5 集被拒，原因分别是没给文件地址、每次取到的字幕都不一样、时长对不上）。这些不是工具坏了，是 B站 字幕接口本身在抖。所以在 exportSelected 结尾加了一轮「对没导出的集再取一次」——第二轮 5 集全部过，最终 9/9。这个自动重试没有新增按钮，也没有第二个文件，用户仍然只拿到一份 Markdown。
+2. 文件名/scope 不能直接用后台 section 名。这个合集的 section 实际是「S1 / 正片 / S2」，而「正片」里装的是 S2-0、S2-1 两集；用户按集号勾选时他要的是「S2」。所以 scope 优先用统一集号前缀，没有统一前缀才退回 section 名。
+
+测试：course 48 → 50 条（前缀分组、section 优先、无前缀不硬拆、prefixOf 导出），新增 season.test.mjs 17 条（frontmatter、只含勾中集、段标题不重复、?t= 与 &t=、未导出原因、文件名清洗）；全量 458 条。
+
+踩坑：course.test.mjs 里原本已有 pc（多 P）、sc（单集）两个变量，我批量改名时把「单集」那两行也改成了 secCourse，Node 直接报 Cannot access 'secCourse' before initialization。批量替换后必须重跑一遍测试。

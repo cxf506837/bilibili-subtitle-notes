@@ -113,6 +113,89 @@
     return out.join('\n');
   }
 
+  function jumpUrl(url, t) {
+    const u = String(url || '');
+    if (!u) return '#t=' + Math.floor(Number(t) || 0);
+    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 't=' + Math.floor(Number(t) || 0);
+  }
+
+  // 课程（合集/多 P）选择性导出：用户挑了哪几集就只拼哪几集，按 S1/S2 分段。
+  // eps: [{ index, section, title, url, verdict, votes, trackLan, sentences }]
+  // failed: [{ index, section, title, verdict, reason, cover }]
+  // meta: { courseTitle, courseId, url, total, scope, exportedAt }
+  function seasonMarkdown(eps, failed, meta) {
+    const m = meta || {};
+    const good = Array.isArray(eps) ? eps : [];
+    const bad = Array.isArray(failed) ? failed : [];
+    const total = Number(m.total) || (good.length + bad.length);
+    const stableN = good.filter(function (e) { return e.verdict === 'stable'; }).length;
+    const singleN = good.length - stableN;
+    const scope = String(m.scope || '').trim();
+    const out = [];
+    out.push('---');
+    out.push('source: ' + (m.url || ''));
+    out.push('course: ' + (m.courseTitle || ''));
+    if (m.courseId) out.push('course_id: ' + m.courseId);
+    out.push('kind: season');
+    out.push('episodes: ' + total);
+    out.push('exported_episodes: ' + good.length + '/' + total);
+    out.push('verified_episodes: ' + stableN + '/' + total);
+    if (scope) out.push('scope: ' + scope);
+    out.push('tags:');
+    out.push('  - bilibili');
+    out.push('  - 视频笔记');
+    out.push('  - 课程');
+    out.push('exported: ' + (m.exportedAt || new Date().toISOString()));
+    out.push('---');
+    out.push('');
+    out.push('# ' + (m.courseTitle || 'B站 课程'));
+    out.push('');
+    out.push('> ' + (scope ? '只导出了「' + scope + '」：' : '') + good.length + ' 集字幕（' + stableN + ' 集两次取样一致'
+      + (singleN ? '，' + singleN + ' 集只取到一份、标了「单次取样」' : '') + '）' + (bad.length ? '，' + bad.length + ' 集没导出（原因在文末）' : '') + '。');
+    out.push('> 每行是那一集播放器里的原句，点时间跳到那一集对应的秒。');
+    out.push('');
+    let lastSection = null;
+    good.forEach(function (e) {
+      const sec = String(e.section || '').trim();
+      if (sec && sec !== lastSection) {
+        out.push('## ' + sec);
+        out.push('');
+        lastSection = sec;
+      }
+      out.push('### 第 ' + Number(e.index || 0) + ' 集 · ' + String(e.title || ''));
+      out.push('');
+      const lines = Array.isArray(e.sentences) ? e.sentences : [];
+      const tag = e.verdict === 'stable' ? '两次取样一致' : '单次取样';
+      out.push('_字幕 ' + lines.length + ' 句 · ' + tag + (e.trackLan ? ' · ' + e.trackLan : '') + '_');
+      out.push('');
+      lines.forEach(function (x) {
+        const text = String((x && x.content) || '').replace(/\s+/g, ' ').trim();
+        const from = Number(x && x.from) || 0;
+        out.push('- [' + fmtTime(from) + '](' + jumpUrl(e.url, from) + ') ' + text);
+      });
+      out.push('');
+    });
+    if (bad.length) {
+      out.push('## 未导出的集（' + bad.length + '）');
+      out.push('');
+      bad.forEach(function (f) {
+        const cover = (f && f.cover != null) ? '（时长覆盖 ' + f.cover + '）' : '';
+        out.push('- 第 ' + Number(f.index || 0) + ' 集 · ' + String(f.title || '') + '：' + reasonText(f.verdict, f.reason) + cover);
+      });
+      out.push('');
+    }
+    return out.join('\n');
+  }
+
+  function seasonFileName(meta) {
+    const m = meta || {};
+    const base = safeName(m.courseTitle || 'B站 课程', 'bilibili-course');
+    const scope = String(m.scope || '').trim();
+    const n = Number(m.count) || 0;
+    const tail = '（' + (scope ? scope + ' · ' : '') + n + ' 集）';
+    return (base + tail).replace(/[. ]+$/, '') + '.md';
+  }
+
   function batchFileName(meta) {
     const m = meta || {};
     const total = Number(m.totalPages) || 0;
@@ -123,6 +206,8 @@
 
   root.BnBatch = {
     batchMarkdown: batchMarkdown,
+    seasonMarkdown: seasonMarkdown,
+    seasonFileName: seasonFileName,
     batchFileName: batchFileName,
     reasonText: reasonText,
     safeName: safeName,

@@ -36,6 +36,7 @@
     const ep = {
       index: i + 1,
       bvid: String(e.bvid || ''),
+      aid: String(e.aid || ''),
       cid: String(e.cid || ''),
       page: num(e.page) || 1,
       title: String(e.title || e.part || ('第 ' + (i + 1) + ' 集')).trim(),
@@ -43,6 +44,10 @@
       sec: num(e.sec),
       kind: kind,
     };
+    if (e.section) {
+      ep.section = String(e.section);
+      ep.sectionIndex = Number(e.sectionIndex) || 0;
+    }
     ep.url = episodeUrl(ep);
     return ep;
   }
@@ -76,10 +81,56 @@
     return summarize({ kind: 'single', id: 'video:' + meta.bvid, title: String(meta.title || '').trim(), episodes: [single] });
   }
 
+  // 集标题里的分段前缀：'S2-6 别再手动帮 AI 点测试了' → 'S2'
+  function prefixOf(title) {
+    const m = /^\s*([A-Za-z]{1,4}\d{1,3})\s*[-_\u2014\u2013:\.]\s*\S/.exec(String(title || ''));
+    return m ? m[1].toUpperCase() : '';
+  }
+
+  // 分组：优先后台给的 section（S1/S2 分段页签），
+  // 只有一个 section（常见：整季都是「正片」）时，退回按标题前缀 S1/S2 分组。
+  function groupSections(course) {
+    const eps = course.episodes;
+    const secTitles = [];
+    eps.forEach(function (ep) {
+      const t = String(ep.section || '').trim();
+      if (t && secTitles.indexOf(t) < 0) secTitles.push(t);
+    });
+    const groups = [];
+    function put(key, title, ep) {
+      let g = null;
+      for (let i = 0; i < groups.length; i++) if (groups[i].key === key) { g = groups[i]; break; }
+      if (!g) { g = { key: key, title: title, episodes: [] }; groups.push(g); }
+      g.episodes.push(ep);
+    }
+    if (secTitles.length > 1) {
+      eps.forEach(function (ep) {
+        const t = String(ep.section || '').trim() || '其他';
+        put('s' + (ep.sectionIndex || 0), t, ep);
+      });
+      return groups;
+    }
+    const pref = eps.map(function (ep) { return prefixOf(ep.title); });
+    const distinct = [];
+    pref.forEach(function (x) { if (x && distinct.indexOf(x) < 0) distinct.push(x); });
+    const hit = pref.filter(function (x) { return !!x; }).length;
+    if (distinct.length > 1 && hit >= Math.ceil(eps.length * 0.6)) {
+      const base = secTitles[0] || '';
+      eps.forEach(function (ep, i) {
+        const k = pref[i] || base || '其他';
+        put('p' + k, k, ep);
+      });
+      return groups;
+    }
+    eps.forEach(function (ep) { put('all', secTitles[0] || '', ep); });
+    return groups;
+  }
+
   function summarize(course) {
     let total = 0;
     course.episodes.forEach(function (e) { total += e.duration; });
     course.total = total;
+    course.sections = groupSections(course);
     return course;
   }
 
@@ -146,5 +197,6 @@
     isWatched: isWatched,
     currentIndex: currentIndex,
     nextUnwatched: nextUnwatched,
+    prefixOf: prefixOf,
   };
 });

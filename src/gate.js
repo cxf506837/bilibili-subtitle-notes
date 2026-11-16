@@ -155,15 +155,19 @@
     const s = d && d.ugc_season;
     if (!s || !Array.isArray(s.sections)) return null;
     const eps = [];
-    s.sections.forEach((sec) => {
+    s.sections.forEach((sec, si) => {
+      const secTitle = String((sec && sec.title) || '').trim();
       (sec.episodes || []).forEach((e) => {
         if (!e || !e.bvid) return;
         eps.push({
           bvid: String(e.bvid),
+          aid: String(e.aid || (e.arc && e.arc.aid) || ''),
           cid: String(e.cid || ''),
           page: Number(e.page) || 1,
           title: String(e.title || (e.arc && e.arc.title) || ''),
           duration: Number(e.arc && e.arc.duration) || 0,
+          section: secTitle,
+          sectionIndex: si,
         });
       });
     });

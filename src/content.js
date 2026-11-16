@@ -193,6 +193,13 @@
   '.crow.done .ci { color: #00a56b; }',
   '.crow.cur { background: var(--bnaccentSoft); }',
   '.crow.cur .cet { font-weight: 600; }',
+  '.crow .cpick { flex: 0 0 auto; margin: 0 2px 0 0; align-self: center; cursor: pointer; }',
+  '.csection { display: flex; align-items: center; gap: 6px; padding: 6px 8px 2px; font-size: 11px; color: var(--bnmuted); border-top: 1px solid var(--bnline); background: var(--bnfill); }',
+  '.csection .cst { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+  '.csection .csall { flex: 0 0 auto; border: 0; background: transparent; color: var(--bnaccent); font: inherit; font-size: 11px; cursor: pointer; padding: 0 2px; }',
+  '.csection .csall:hover { text-decoration: underline; }',
+  '.cfoot { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--bnline); }',
+  '.cfoot .cnum { flex: 1; min-width: 0; font-size: 11px; color: var(--bnmuted); }',
   ].join('');
 
   const HTML = [
@@ -277,6 +284,7 @@
   let courseProgress = {};
   let courseCur = -1;
   let courseLastWatched = -1;
+  let coursePick = {};
   let progWroteAt = 0;
 
   // 进度：一条一集，键 bnp:<cid> = 看到第几秒。放 chrome.storage.local，换视频 / 关页面都还在。
@@ -351,34 +359,234 @@
     }
   }
 
+  function pickedEps() {
+    const m = courseModel;
+    if (!m) return [];
+    return m.episodes.filter(function (ep) { return !!coursePick[ep.cid]; });
+  }
+
+  function syncPickLabel() {
+    const foot = courseListEl.querySelector('.cfoot');
+    if (!foot) return;
+    const n = pickedEps().length;
+    const num = foot.querySelector('.cnum');
+    const btn = foot.querySelector('.cexp');
+    if (num) num.textContent = n ? '已选 ' + n + ' 集' : '勾选集数后可只导出这几集';
+    if (btn) {
+      btn.textContent = n ? '导出选中（' + n + ' 集）' : '导出选中';
+      btn.disabled = !n;
+      btn.classList.toggle('accent', n > 0);
+    }
+  }
+
   function renderCourseList() {
     const m = courseModel;
     if (!m) return;
     const frag = document.createDocumentFragment();
-    m.episodes.forEach(function (ep, i) {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'crow' + (i === courseCur ? ' cur' : '') + (window.BnCourse.isWatched(ep, courseProgress) ? ' done' : '');
-      row.dataset.i = String(i);
-      row.title = ep.title + (ep.url ? '' : '（没有跳转地址）');
-      const ci = document.createElement('span');
-      ci.className = 'ci';
-      ci.textContent = window.BnCourse.isWatched(ep, courseProgress) ? '✓' : String(ep.index);
-      const ct = document.createElement('span');
-      ct.className = 'cet';
-      ct.textContent = ep.title;
-      const cd = document.createElement('span');
-      cd.className = 'cd';
-      cd.textContent = window.BnCourse.fmtDur(ep.duration);
-      row.appendChild(ci);
-      row.appendChild(ct);
-      row.appendChild(cd);
-      frag.appendChild(row);
+    const multi = m.kind === 'season';
+    const groups = (m.sections && m.sections.length) ? m.sections : [{ title: '', episodes: m.episodes }];
+    let pos = -1;
+    groups.forEach(function (g) {
+      if (multi && groups.length > 1) {
+        const sh = document.createElement('div');
+        sh.className = 'csection';
+        const st = document.createElement('span');
+        st.className = 'cst';
+        st.textContent = (g.title || '其他') + '（' + g.episodes.length + ' 集）';
+        const sa = document.createElement('button');
+        sa.type = 'button';
+        sa.className = 'csall';
+        sa.textContent = '全选';
+        sa.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          const all = g.episodes.every(function (ep) { return !!coursePick[ep.cid]; });
+          g.episodes.forEach(function (ep) {
+            if (all) delete coursePick[ep.cid]; else coursePick[ep.cid] = true;
+          });
+          renderCourseList();
+        });
+        sh.appendChild(st);
+        sh.appendChild(sa);
+        frag.appendChild(sh);
+      }
+      g.episodes.forEach(function (ep) {
+        pos = m.episodes.indexOf(ep);
+        const row = document.createElement('div');
+        row.className = 'crow' + (pos === courseCur ? ' cur' : '') + (window.BnCourse.isWatched(ep, courseProgress) ? ' done' : '');
+        row.dataset.i = String(pos);
+        row.setAttribute('role', 'button');
+        row.tabIndex = 0;
+        row.title = ep.title + (ep.url ? '' : '（没有跳转地址）');
+        if (multi) {
+          const ck = document.createElement('input');
+          ck.type = 'checkbox';
+          ck.className = 'cpick';
+          ck.checked = !!coursePick[ep.cid];
+          ck.title = '勾上就参与「导出选中」';
+          ck.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            if (ck.checked) coursePick[ep.cid] = true; else delete coursePick[ep.cid];
+            syncPickLabel();
+          });
+          row.appendChild(ck);
+        }
+        const ci = document.createElement('span');
+        ci.className = 'ci';
+        ci.textContent = window.BnCourse.isWatched(ep, courseProgress) ? '✓' : String(ep.index);
+        const ct = document.createElement('span');
+        ct.className = 'cet';
+        ct.textContent = ep.title;
+        const cd = document.createElement('span');
+        cd.className = 'cd';
+        cd.textContent = window.BnCourse.fmtDur(ep.duration);
+        row.appendChild(ci);
+        row.appendChild(ct);
+        row.appendChild(cd);
+        frag.appendChild(row);
+      });
     });
+    if (multi) {
+      const foot = document.createElement('div');
+      foot.className = 'cfoot';
+      const num = document.createElement('span');
+      num.className = 'cnum';
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'btn sm';
+      clear.textContent = '清空';
+      clear.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        coursePick = {};
+        renderCourseList();
+      });
+      const exp = document.createElement('button');
+      exp.type = 'button';
+      exp.className = 'btn sm cexp';
+      exp.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        exportSelected();
+      });
+      foot.appendChild(num);
+      foot.appendChild(clear);
+      foot.appendChild(exp);
+      frag.appendChild(foot);
+    }
     courseListEl.textContent = '';
     courseListEl.appendChild(frag);
+    syncPickLabel();
   }
 
+  // 课程选择性导出：只对勾上的集取样过闸门，拼成一份 Markdown，交给 agent / Obsidian。
+  async function exportSelected() {
+    const m = courseModel;
+    if (!m) return;
+    const picks = pickedEps();
+    if (!picks.length) { setStatus('warn', '先在课程清单里勾选集数'); return; }
+    if (state.batch && state.batch.running) {
+      state.batch.cancel = true;
+      setStatus('warn', '正在停止…', '这一集跑完就停，已导出的仍会落盘');
+      return;
+    }
+    state.batch = { running: true, cancel: false };
+    const good = [];
+    const bad = [];
+    const courseUrl = 'https://www.bilibili.com/video/' + state.bvid;
+    try {
+      for (let i = 0; i < picks.length; i++) {
+        if (state.batch.cancel) break;
+        const ep = picks[i];
+        setStatus('warn', '导出选中 ' + (i + 1) + '/' + picks.length + ' · 第 ' + ep.index + ' 集 ' + String(ep.title).slice(0, 12), '每集取样 2~4 次过闸门');
+        let r = null;
+        try {
+          r = await G.gateSubtitle({ aid: ep.aid || (state.meta && state.meta.aid), cid: ep.cid, pageDur: ep.duration || 0 }, function (pg) {
+            if (pg && pg.state === 'probing') {
+              setStatus('warn', '导出选中 ' + (i + 1) + '/' + picks.length + ' · 第 ' + ep.index + ' 集 取样 ' + pg.attempt + '/' + pg.total);
+            }
+          }, { attempts: 4, earlyVotes: 2 });
+        } catch (e) {
+          r = { verdict: 'api-error', reason: String(e).slice(0, 60) };
+        }
+        if (r && r.sentences && r.sentences.length && (r.verdict === 'stable' || r.verdict === 'single')) {
+          good.push({
+            index: ep.index,
+            section: ep.section || '',
+            title: ep.title,
+            url: ep.url || courseUrl,
+            verdict: r.verdict,
+            votes: r.votes || 1,
+            trackLan: (r.track && r.track.lan) || '',
+            sentences: r.sentences,
+          });
+        } else {
+          bad.push({
+            index: ep.index,
+            section: ep.section || '',
+            title: ep.title,
+            verdict: (r && r.verdict) || 'no-attempt',
+            reason: (r && r.reason) || '',
+            cover: (r && r.stats && typeof r.stats.cover === 'number') ? Number(r.stats.cover.toFixed(3)) : null,
+            aid: ep.aid || '', cid: ep.cid, duration: ep.duration || 0, url: ep.url || courseUrl,
+          });
+        }
+      }
+    } finally {
+      state.batch.running = false;
+    }
+    // 结尾再试一次没导出的集：B站 字幕接口本身会抖（同一 (aid,cid) 连取几次可能返回不同文件），
+    // 一次不成立不代表这一集没字幕，重取一轮能把瞬时的坏样本排掉。
+    if (bad.length && !state.batch.cancel) {
+      const retry = bad.slice();
+      for (let i = 0; i < retry.length; i++) {
+        if (state.batch.cancel) break;
+        const ep = retry[i];
+        setStatus('warn', '再试一次 ' + (i + 1) + '/' + retry.length + ' · 第 ' + ep.index + ' 集 ' + String(ep.title).slice(0, 12), '第一次没过闸门，重新取样');
+        let r2 = null;
+        try {
+          r2 = await G.gateSubtitle({ aid: ep.aid || (state.meta && state.meta.aid), cid: ep.cid, pageDur: ep.duration || 0 }, null, { attempts: 5, earlyVotes: 2 });
+        } catch (e) {
+          r2 = null;
+        }
+        if (r2 && r2.sentences && r2.sentences.length && (r2.verdict === 'stable' || r2.verdict === 'single')) {
+          good.push({
+            index: ep.index, section: ep.section, title: ep.title, url: ep.url,
+            verdict: r2.verdict, votes: r2.votes || 1,
+            trackLan: (r2.track && r2.track.lan) || '',
+            sentences: r2.sentences,
+          });
+          bad.splice(bad.indexOf(ep), 1);
+        }
+      }
+      good.sort(function (a, b) { return Number(a.index) - Number(b.index); });
+    }
+    const stopped = !!state.batch.cancel;
+    if (!good.length) {
+      setStatus('bad', '选中这几集的字幕都没过闸门', '多半是没登录 B站，或这些集没有 AI 字幕');
+      return;
+    }
+    const secTitles = [];
+    const prefixes = [];
+    picks.forEach(function (ep) {
+      if (ep.section && secTitles.indexOf(ep.section) < 0) secTitles.push(ep.section);
+      const p = (window.BnCourse && window.BnCourse.prefixOf) ? window.BnCourse.prefixOf(ep.title) : '';
+      if (p && prefixes.indexOf(p) < 0) prefixes.push(p);
+    });
+    // 用户按「S2-0 …」这种集号勾选时，文件名/scope 用 S2 比用后台 section 名（例如「正片」）更贴近他选的东西。
+    const scope = prefixes.length === 1
+      ? prefixes[0]
+      : (secTitles.length === 1 ? secTitles[0] : picks.length === m.episodes.length ? '全部 ' + m.episodes.length + ' 集' : '选中 ' + picks.length + ' 集');
+    const text = window.BnBatch.seasonMarkdown(good, bad, {
+      courseTitle: m.title || 'B站 课程',
+      courseId: m.id || '',
+      url: courseUrl,
+      total: picks.length,
+      scope: scope,
+    });
+    downloadMarkdown(text, window.BnBatch.seasonFileName({ courseTitle: m.title || 'B站 课程', scope: scope, count: good.length }));
+    const stableN = good.filter(function (x) { return x.verdict === 'stable'; }).length;
+    setStatus(bad.length ? 'warn' : 'ok',
+      (stopped ? '已停止：导出了 ' : '已导出 ') + good.length + '/' + picks.length + ' 集（' + stableN + ' 集两次取样一致）',
+      bad.length ? '没导出的集和原因写在文件末尾' : '可以直接交给 agent / Obsidian');
+  }
   function openEpisode(i) {
     const m = courseModel;
     if (!m || !m.episodes[i]) return;

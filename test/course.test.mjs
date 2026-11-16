@@ -65,6 +65,10 @@ ok('单集：kind=single', sc.kind === 'single', sc.kind);
 ok('单集：只有一集', sc.episodes.length === 1);
 ok('单集：标题兜底为本集', sc.episodes[0].title === '我的世界克苏鲁全集');
 
+// 3.5 集号前缀（选择性导出用它给文件命名）
+ok('前缀：S2-6 → S2', C.prefixOf('S2-6 别再手动帮 AI 点测试了') === 'S2', C.prefixOf('S2-6 别再手动帮 AI 点测试了'));
+ok('前缀：没有集号返回空', C.prefixOf('正片第一集') === '', C.prefixOf('正片第一集'));
+
 // 4. 空值
 ok('空 meta 返回 null', C.build(null) === null && C.build({}) === null);
 
@@ -108,5 +112,37 @@ ok('全部看完返回 null', allDone === null);
 const wrapAround = C.nextUnwatched(course, { '42722657079': 191 }, 2);
 ok('末尾之后回绕到未看的第 2 集', wrapAround && wrapAround.index === 2, wrapAround && wrapAround.index);
 
+
+// 分组：S1 / S2 只在集标题里（后台只给一个「正片」section）时要按前缀拆开
+const prefMeta = JSON.parse(JSON.stringify(seasonMeta));
+prefMeta.season.eps = [
+  { bvid: 'BV1A', cid: 'c1', page: 1, title: 'S1-0 引言', duration: 100 },
+  { bvid: 'BV1B', cid: 'c2', page: 1, title: 'S1-1 第二个', duration: 100 },
+  { bvid: 'BV1C', cid: 'c3', page: 1, title: 'S2-6 别再手动点测试了', duration: 100 },
+  { bvid: 'BV1D', cid: 'c4', page: 1, title: 'S2-7 最后一个', duration: 100 },
+];
+const prefCourse = C.build(prefMeta);
+ok('前缀分组：拆成 S1 / S2 两组', prefCourse.sections.length === 2, prefCourse.sections.map(function (g) { return g.title; }));
+ok('前缀分组：S1 有 2 集', prefCourse.sections[0] && prefCourse.sections[0].episodes.length === 2, prefCourse.sections[0] && prefCourse.sections[0].episodes.length);
+ok('前缀分组：S2 第 1 集是 S2-6', prefCourse.sections[1] && prefCourse.sections[1].episodes[0].title.indexOf('S2-6') === 0);
+
+// 后台真给了两个 section：按 section 分组，优先级高于前缀
+const secMeta = JSON.parse(JSON.stringify(seasonMeta));
+secMeta.season.eps = [
+  { bvid: 'BV2A', cid: 'd1', page: 1, title: '第 1 集 开场', duration: 100, section: '正片', sectionIndex: 0 },
+  { bvid: 'BV2B', cid: 'd2', page: 1, title: '第 2 集 加餐', duration: 100, section: '幕后', sectionIndex: 1 },
+];
+const secCourse = C.build(secMeta);
+ok('section 分组：两组且标题保留', secCourse.sections.length === 2 && secCourse.sections[1].title === '幕后', secCourse.sections.map(function (g) { return g.title; }));
+ok('section 分组：aid 被带出来', secCourse.episodes[0].aid === '' || typeof secCourse.episodes[0].aid === 'string');
+
+// 单集 / 无前缀：只有一组，不硬拆
+const plainMeta = JSON.parse(JSON.stringify(seasonMeta));
+plainMeta.season.eps = [
+  { bvid: 'BV3A', cid: 'e1', page: 1, title: '开场', duration: 100 },
+  { bvid: 'BV3B', cid: 'e2', page: 1, title: '结尾', duration: 100 },
+];
+const plainCourse = C.build(plainMeta);
+ok('无前缀：只有一组', plainCourse.sections.length === 1 && plainCourse.sections[0].episodes.length === 2);
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
