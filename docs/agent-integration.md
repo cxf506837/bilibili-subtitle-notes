@@ -111,3 +111,53 @@
 
 - `bn-study-pack/1`：2026-11-16 首版（课程 → 集 → 概念 → 锚点）。
 - 加字段不升版本；删字段、改语义、改单位必须升到 `/2`，并在本文件顶部写明迁移方式。
+
+## 7. 附带的 agent skill：skills/bili-study
+
+仓库里带了一个可以直接装进 agent 的 skill（Claude Code / DSH / 任何读 SKILL.md 的宿主）：
+
+- skills/bili-study/SKILL.md —— 流程：看懂包 → 按目标裁剪 → 审跳过清单 → 一次讲一个概念 → 用逐字原话拷打 → 记掌握度
+- skills/bili-study/tools/study.mjs —— 确定性部分（不调模型）：切词、打分、裁剪、救回、出 Mermaid、写状态
+
+装法（DSH）：把 skills/bili-study 整个目录复制到 ~/.dsh/skills/。其它宿主按各自 skill 目录放。
+
+```bash
+node skills/bili-study/tools/study.mjs plan  <学习包.json> --goal "<目标>" --out ./study/<课程>
+node skills/bili-study/tools/study.mjs state <学习包.json> --goal "<目标>" --out ./study/<课程>
+node skills/bili-study/tools/study.mjs mark  ./study/<课程>/study-state.json "<概念>" understood --quote "<原话>" --url "<链接>"
+```
+
+裁剪规则（可解释、可反驳）：
+
+1. 命中目标（名字 ×3、定义 ×2、原话 ×1）或**跨集复用**的概念必留；
+2. 其余按分数补到「总数的 60%」；没填目标就全留（不替用户瞎删）；
+3. **救回**：某个留下的概念，其定义或原话里点到的名字，不能被丢掉（最多迭代两轮）。
+
+图的边只是「同一集里按讲课顺序相邻」，不是因果。
+
+## 8. 掌握度回流：bn-study-state/1
+
+agent 拷打完写到 study-state.json，下一步（阶段 D）会让插件面板读它，标出「哪些懂、哪些半懂、下次从哪继续」。
+
+```json
+{
+  "spec": "bn-study-state/1",
+  "course": "【从零开始的 AI 学习】",
+  "course_id": "season:8719249",
+  "goal": "三周内能独立用 agent 跑通一个自动化任务",
+  "updated_at": "2026-11-16T04:32:29.195Z",
+  "concepts": [
+    { "name": "agent", "status": "understood", "asked": 1, "correct": 1,
+      "last_quote": "能替你写代码、跑脚本的AI执行者",
+      "last_url": "https://www.bilibili.com/video/BV1pwnj6BEMP?t=110",
+      "updated_at": "2026-11-16T04:32:29.195Z" }
+  ],
+  "next": [ { "name": "回滚", "url": "…?t=…", "reason": "上次没讲清，再考一次" } ],
+  "progress": { "understood": 1, "shaky": 0, "unknown": 16, "total": 17 }
+}
+```
+
+- status 只有三档：understood（能自己说清 + 知道什么时候用）、shaky（方向对但有漏洞）、unknown（说错或没考）。
+- asked / correct 是拷打次数与答对次数，用来算同一个概念是不是卡住了（连续两次 shaky 就该回去看视频，而不是继续考）。
+- last_quote 必须是**那次判分时贴给用户的原话**，last_url 是它的时间戳链接 —— 回流到面板后，用户点「这个我不太懂」能直接跳回那一秒。
+- 字段只加不改；改语义升 /2。

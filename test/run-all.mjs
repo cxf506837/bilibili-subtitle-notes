@@ -21,6 +21,7 @@ const FILES = [
   'season.test.mjs',      // 课程选择性导出：只拼勾中的集
   'concepts.test.mjs',    // 概念抽取：切块 / 只认句子 id / 跨集合并
   'study.test.mjs',       // 学习包：JSON 结构 + Markdown 版面
+  'studyplan.test.mjs',   // agent 侧：裁剪 / 救回 / 图 / 掌握度状态机
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 
