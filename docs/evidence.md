@@ -518,3 +518,16 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 | 点菜单里的「设置」 | 真的打开 `chrome-extension://<id>/src/options.html`（全新 profile 复验） |
 
 一个必须记住的坑：老的 `dist\edge-profile` 里后台 service worker 用的是**缓存下来的旧 background.js**——同一个消息类型 `{type:"openOptions"}` 在 `.click()` 时回「The message port closed before a response was received.」、设置页也不开；换全新 profile 立刻就对了。判产品行为别拿陈旧 profile 下结论（这条以前踩过一次，这次又踩到）。
+
+## 二十四、面板顶部只留一张卡：课程条与掌握度合并、掌握度默认收起（2026-11-16，1.4.11）
+
+问题不是某处坏掉，是**叠**：系列视频页，面板顶部依次是课程条（54px）、掌握度条（34px，每次开页都自动展开成 61px 起）、首屏卡片，再往下才是笔记。三层横条加起来把第一屏几乎吃掉。
+
+| 改动 | 做法 | 真机实测（BV1BgH36DE7y，1280×800） |
+| --- | --- | --- |
+| 合成一张卡 | `.course:has(+ .mast:not(.hidden))` 去掉下半圆角，`.mast` 上移 1px、去掉上半圆角 | `courseBottom 126` / `mastTop 125`（1px 重叠，两张卡贴成一张，上半灰底、下半白底） |
+| 掌握度默认收起 | `mastOpenPref()` 读 localStorage `bn.mastOpen`（默认 false），点击 `setMastOpen()` 写回 | 开页 `mastH 34` / `mastOpen false`；点一下 `mastH 61` / `open true`；reload 后仍 `open true`（偏好持久） |
+
+为什么不用 `:has()` 之外的办法：不动 DOM（掌握度节点还在课程条后面），所以「课程条隐藏时掌握度自己还成立」这条老逻辑不用改；`:has()` 在 Edge 157 / Chrome 105+ 都有，扩展本来就只跑这两家。
+
+顺带的判断：`rows:1` 只显示「已经能讲清」那行是因为测试用的 study-state 里概念名是 `a` / `r`（_lab 造的数据），不是渲染 bug；stream 前四个子元素是 note / note awayn / note / note，也正常。

@@ -192,6 +192,9 @@
   // 课程条：合集 / 多 P 视频显示「课程 → 集」，点一集直接跳过去
   '.course { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; overflow: hidden; background: var(--bnfill); }',
   '.course.hidden { display: none; }',
+  // 课程条和掌握度是同一个东西的两半：贴成一张卡（上半灰底、下半白底），别让面板顶上叠三个横条
+  '.course:has(+ .mast:not(.hidden)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }',
+  '.course:has(+ .mast:not(.hidden)) + .mast { margin-top: -1px; border-top-left-radius: 0; border-top-right-radius: 0; }',
   '.mast { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; background: var(--bnbg); padding: 7px 9px; }',
   '.mast.hidden { display: none; }',
   '.mast .mh { display: flex; align-items: center; gap: 6px; cursor: pointer; }',
@@ -876,7 +879,7 @@
       }
       const p = window.BnStudyState.summarize(st);
       mastEl.classList.remove('hidden');
-      if (mastSeen !== st.course_id) { mastSeen = st.course_id; mastEl.classList.add('open'); }
+      if (mastSeen !== st.course_id) { mastSeen = st.course_id; mastEl.classList.toggle('open', mastOpenPref() === true); }
       mastMetaEl.textContent = '懂 ' + p.understood + ' · 半懂 ' + p.shaky + ' · 没考 ' + p.unknown;
       mastMetaEl.title = (st.course || '') + ' · 共 ' + p.total + ' 个概念 · agent 拷打的结果';
       const nx = window.BnStudyState.nextList(st, 3);
@@ -901,9 +904,17 @@
     }
   }
 
+  // 掌握度默认收起：展开只是「看哪三个概念没讲清」，不该每次开页都占半屏；用户展开过一次就记住
+  function mastOpenPref() {
+    try { const v = localStorage.getItem('bn.mastOpen'); return v === null ? false : v === '1'; } catch (e) { return false; }
+  }
+  function setMastOpen(on) {
+    mastEl.classList.toggle('open', !!on);
+    try { localStorage.setItem('bn.mastOpen', on ? '1' : '0'); } catch (e) {}
+  }
   mastHeadEl.addEventListener('click', function (ev) {
     if (ev.target && ev.target.id === 'mastNext') return;
-    mastEl.classList.toggle('open');
+    setMastOpen(!mastEl.classList.contains('open'));
   });
 
   function openEpisode(i) {
