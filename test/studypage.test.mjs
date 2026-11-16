@@ -1,0 +1,90 @@
+// 学习页的纯函数：挑课程、算进度、算掌握度、数笔记、按词过滤概念。
+import { readFileSync } from 'node:fs';
+import { createContext, runInContext } from 'node:vm';
+
+function load(file) {
+  const src = readFileSync(new URL('../src/' + file, import.meta.url), 'utf8');
+  const ctx = createContext({ console });
+  ctx.globalThis = ctx;
+  runInContext(src, ctx);
+  return ctx;
+}
+const P = load('studypage.js').BnStudyPage;
+
+let pass = 0, fail = 0;
+function ok(name, cond, extra) {
+  if (cond) { pass++; console.log('  ok   ' + name); }
+  else { fail++; console.log('  FAIL ' + name + (extra ? ' :: ' + JSON.stringify(extra) : '')); }
+}
+
+const course = {
+  id: 'season:9', kind: 'season', title: '【从零开始的 AI 学习】', ep_count: 3, total: 900,
+  updated_at: '2026-11-16T10:00:00.000Z',
+  episodes: [
+    { index: 1, bvid: 'BV1', cid: 'c1', page: 1, title: 'S1-0 引言', duration: 200 },
+    { index: 2, bvid: 'BV2', cid: 'c2', page: 1, title: 'S2-0 自动写代码', duration: 300 },
+    { index: 3, bvid: 'BV3', cid: 'c3', page: 1, title: 'S2-1 别再手动点测试', duration: 400 },
+  ],
+};
+const other = { id: 'video:BV9', kind: 'single', title: '单集', ep_count: 1, total: 60,
+  updated_at: '2026-11-15T10:00:00.000Z', episodes: [{ index: 1, bvid: 'BV9', cid: 'c9', page: 1, title: '单集', duration: 60 }] };
+
+const all = {
+  'bnc:season:9': course,
+  'bnc:video:BV9': other,
+  // 概念缓存也用 bnc: 前缀，必须被 courses() 排除
+  'bnc:c1': { v: '3:1:3', concepts: [{ name: 'x' }], savedAt: 1 },
+  'bnp:c1': 190,        // 200 秒的 95% ⇒ 算看过
+  'bnp:c2': 120,        // 300 秒的 40% ⇒ 没看过
+  'bnp:c3': 0,
+  'bnstudy:season:9': { spec: 'bn-study-state/1', course_id: 'season:9', updated_at: '2026-11-16T11:00:00.000Z',
+    concepts: [{ name: 'a', status: 'understood' }, { name: 'b', status: 'shaky' }, { name: 'c', status: 'unknown' }, { name: 'd', status: 'shaky' }] },
+  // 掌握度也可能以 { key, state } 包装出现（BnStudyState.fromStorage 的返回形状）
+  'bnstudy:video:BV9': { key: 'bnstudy:video:BV9', state: { course_id: 'video:BV9', concepts: [{ name: 'z', status: 'unknown' }] } },
+  'bnidx:BV1:c1': { bvid: 'BV1', cid: 'c1', count: 4 },
+  'bnidx:BV2:c2': { bvid: 'BV2', cid: 'c2', count: 7 },
+  'bnidx:BV3:c3': { bvid: 'BV3', cid: 'c3', notes: [{}, {}, {}] },
+};
+
+ok('courses 只认课程形状（排除概念缓存）', P.courses(all).length === 2);
+ok('courses 按 updated_at 倒序', P.courses(all)[0].id === 'season:9');
+ok('pick 按 id 取', P.pick(P.courses(all), 'video:BV9').id === 'video:BV9');
+ok('pick 找不到给第一个', P.pick(P.courses(all), 'nope').id === 'season:9');
+ok('pick 空列表给 null', P.pick([], 'x') === null);
+ok('cidsOf', JSON.stringify(P.cidsOf(course)) === JSON.stringify(['c1', 'c2', 'c3']));
+ok('cidsOf 空课程', P.cidsOf(null).length === 0);
+ok('进度表只收 bnp:', Object.keys(P.progressMap(all)).length === 3 && P.progressMap(all).c1 === 190);
+ok('看过阈值 90%', P.watched(course.episodes[0], { c1: 190 }) === true);
+ok('没到 90% 不算看过', P.watched(course.episodes[1], { c2: 120 }) === false);
+ok('没时长时 60 秒算看过', P.watched({ cid: 'x', duration: 0 }, { x: 61 }) === true);
+const m = P.masteryOf(all, 'season:9');
+ok('掌握度计数', m.understood === 1 && m.shaky === 2 && m.unknown === 1 && m.total === 4, m);
+ok('掌握度行文案', P.line(m) === '懂 1 · 半懂 2 · 没考 1', P.line(m));
+ok('没考过时的文案', P.line({ total: 0 }) === '还没考过');
+ok('包装形状也认', P.masteryOf(all, 'video:BV9').total === 1);
+const nm = P.notesMap(all);
+ok('笔记数按 count', nm.c1 === 4 && nm.c2 === 7);
+ok('笔记数退回 notes 数组长度', nm.c3 === 3);
+const ov = P.overview(all, course);
+ok('overview 集数', ov.count === 3);
+ok('overview 看过集数', ov.watched === 1, ov.watched);
+ok('overview 笔记合计', ov.notes === 14, ov.notes);
+ok('overview 百分比按已看时长', ov.pct === Math.round((200 / 900) * 100), ov.pct);
+ok('overview 下一集是没看的第一集', ov.next && ov.next.cid === 'c2');
+ok('overview 带掌握度行', ov.masteryLine === '懂 1 · 半懂 2 · 没考 1');
+const groups = [
+  { ep: 1, label: 'S1-0', title: '引言', items: [{ name: 'agent', def: '能替你写代码的东西', anchors: [{ quote: '直接让 agent 写几十行' }] }] },
+  { ep: 2, label: 'S2-0', title: '自动写代码', items: [{ name: 'Git', def: '版本管理', anchors: [{ quote: '用 git 存档' }] }] },
+];
+ok('空查询原样返回', P.filterGroups(groups, '').length === 2);
+ok('按名字命中', P.filterGroups(groups, 'agent').length === 1);
+ok('按定义命中', P.filterGroups(groups, '版本管理')[0].items[0].name === 'Git');
+ok('按原话命中', P.filterGroups(groups, '存档')[0].items[0].name === 'Git');
+ok('大小写不敏感', P.filterGroups(groups, 'GIT').length === 1);
+ok('多词全部命中才留', P.filterGroups(groups, 'git 存档').length === 1);
+ok('多词有一项不中就空', P.filterGroups(groups, 'git agent').length === 0);
+ok('被过滤空的分组不返回', P.filterGroups(groups, 'agent').every(g => g.items.length > 0));
+ok('对 null 安全', P.filterGroups(null, 'x').length === 0);
+
+console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
+if (fail) process.exit(1);

@@ -721,3 +721,32 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 - 这句话只是「告诉 agent 去哪找」，不保证找得到。下载目录被改过、文件被改名、agent 在别的机器上，它还是会问你要路径——所以那句话里明确写了「找不到就问我路径，别猜」。
 - 不给 `downloads` 权限就读不到下载目录的绝对路径（那是更准的做法，但要新增权限、商店要写理由）。当前取向是：零新权限 + 用户点一下图标兜底。
 - 弹窗自动复制只在「记录里没有 copiedAt」时触发，不会每次开图标都覆盖用户剪贴板。
+
+## 三十二、学习页：一门课一屏看完（1.4.20）
+
+「概念视图」解决的是「视频里讲了什么」，「学习页」解决的是「这一门课我学到哪了」：左栏课程/每集 + 已看打勾，中栏按集把概念和逐字引文铺开（点时间戳跳回 B站 那一秒），右栏掌握度与「接着学」。
+
+### 入口（两条，都实测过）
+
+| # | 入口 | 实测 |
+| --- | --- | --- |
+| 1 | 面板工具栏 ⋯ → 「学习页」 | `#btnStudy` 的 `hidden=false`，点开落在 `chrome-extension://<id>/src/study.html?course=season%3A8719249` |
+| 2 | 点扩展图标 → 第一屏页脚「学习页」 | 直接路由到最近一门课 |
+
+### 真机数字（真 Edge 157 + `dist\edge-profile` + 真扩展）
+
+- 课程 5 门；当前课【从零开始的 AI 学习】25 集已看 5 集；overview = `16% 看过 5/25 集 · 还剩 2 小时 36 分 · 笔记 54 条`。
+- 中栏 25 个集分组 / 230 个概念条目 / 527 条逐字引文；搜索 `agent` 过滤后 29 条。
+- 右栏 `懂 5 · 半懂 11 · 没考 75` + `agent 拷打于 2026-11-16 06:41`；「接着学」= S1-1 为什么你写不好提示词？
+- 截图：`_lab\tour\120-study.png`（三栏）、`_lab\tour\121-panel-study.png`（⋯ 菜单里的入口）。
+
+### 这一轮挖出来的三个真 bug
+
+1. **学习页白屏**：`src/study.html` 里写的是 `<script src="concept.js">`，仓库里实际叫 `concepts.js` ⇒ `window.BnConcept` 为 undefined，`renderGroups` 里 `keyOf: C.conceptKey` 抛 TypeError，后面的掌握度也不再渲染。症状是「有课名、没内容」。
+2. **集标题重复**：group 头里 `label`（S1-0）和 `title`（S1-0 引言：…）都印出来 ⇒ 标题去掉与 label 相同的前缀。
+3. **「学习页」按钮永远不出现**：它的显隐只写在 `syncMultiBtn()` 里，而 `syncMultiBtn` 由 `syncMeta` 阶段调用——那时候 `refreshCourse()` 还没把 `courseModel` 建好，之后没人再刷这个按钮，于是一直带着 `hidden`（点都点不到）。修法是新增 `syncStudyBtn()` 并接到 `refreshCourse` 的四条出口（两条早退、成功结尾、catch）。
+
+### 两条环境教训
+
+- **改了 `background.js` 必须重载扩展**：跑着的 MV3 service worker 还是旧代码，此时 `sendMessage({type:"openStudy"})` 会安静地返回 `undefined`（不报错），看起来像「新分支没写对」。`{type:"diag"}` 这种老分支照常正常，最容易误判成「消息通道坏了」。
+- **CDP 找扩展上下文别硬编码扩展 id**：同一台机器上装着沉浸式翻译等扩展，先正则抠所有 `chrome-extension://<32 位>/` 再排除已知 id，比写死更快；`Runtime.evaluate` 必须带 `contextId`，隔离世界的 `name` 就是扩展名「B站字幕笔记」。

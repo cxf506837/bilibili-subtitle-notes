@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>B站字幕笔记 · 学习页</title>
+<link rel="stylesheet" href="study.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot"></span><b>B站 字幕笔记</b><span class="sub">学习页</span></div>
+  <label class="pick">
+    <select id="courseSel" aria-label="选课程"></select>
+  </label>
+  <input id="q" class="q" type="search" placeholder="搜概念 / 原话 / 人名（空格分隔多个词）" autocomplete="off">
+  <button id="next" class="primary" type="button" hidden>接着学</button>
+</header>
+
+<main class="wrap">
+  <aside class="rail">
+    <h2>这门课</h2>
+    <div id="overview" class="overview"></div>
+    <h2>每集</h2>
+    <ol id="eps" class="eps"></ol>
+  </aside>
+
+  <section class="mid">
+    <div id="empty" class="empty" hidden></div>
+    <div id="groups"></div>
+  </section>
+
+  <aside class="side">
+    <div id="mastery" class="card mastery"></div>
+    <div class="card tip">
+      <b>怎么用</b>
+      <ol>
+        <li>在 B站 视频页看课，面板边看边记；</li>
+        <li>看完点「概念」把知识点攒起来；</li>
+        <li>勾集 → 「交给 agent」→ 把剪贴板里那句话粘给 agent；</li>
+        <li>agent 拷打完，把 <code>study-state.json</code> 复制进剪贴板 → 点扩展图标「应用到面板」；</li>
+        <li>回到这页，懂 / 半懂 会标在概念上。</li>
+      </ol>
+    </div>
+  </aside>
+</main>
+<script src="coursestore.js"></script>
+<script src="studypage.js"></script>
+<script src="conceptview.js"></script>
+<script src="concepts.js"></script>
+<script src="studypage-ui.js"></script>
+</body>
+</html>

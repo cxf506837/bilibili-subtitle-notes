@@ -342,6 +342,15 @@
       });
     });
   });
+  document.getElementById('studyPage').addEventListener('click', function () {
+    // 整门课一屏：挑最近的课程打开（弹窗里没有「当前课程」这回事）
+    chrome.storage.local.get(null, function (all) {
+      const one = window.BnCourseStore ? window.BnCourseStore.fromStorage(all)[0] : null;
+      const url = chrome.runtime.getURL('src/study.html') + (one ? '?course=' + encodeURIComponent(one.id) : '');
+      chrome.tabs.create({ url: url });
+      window.close();
+    });
+  });
   document.getElementById('opt').addEventListener('click', function () {
     chrome.runtime.openOptionsPage();
     window.close();

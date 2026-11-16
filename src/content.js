@@ -305,6 +305,7 @@
     '<button class="btn sm hidden" id="btnVerify" title="这份字幕只取到过一份、没交叉核对：再取一次，两次一致才算核过">再取样</button>',
     '<button class="btn sm hidden" id="btnHard" title="B站 没有字幕轨时，用本地 OCR 读画面里的硬字幕（慢，需要保持播放）">画面字幕</button>',
     '<button class="btn sm hidden" id="btnMulti" title="这是合集 / 多 P：逐 P 取样并过闸门，把有字幕的那些拼成一份 Markdown。慢，会显示进度">导出全部 P</button>',
+    '<button class="btn sm hidden" id="btnStudy" title="整门课一屏看：概念按集分组、掌握度、还剩几集，点原话跳回那一秒">学习页</button>',
     '<button class="btn sm hidden" id="btnDiag" title="复制诊断信息（版本 / 页面 / 字幕状态 / 端点），贴到 issue 里；不含 API Key">诊断</button>',
     '</div>',
     '<button class="btn accent" id="btnFold" title="收起右侧笔记面板">收起 ▸</button>',
@@ -444,6 +445,7 @@
       if (!window.BnCourse || !meta) {
         courseEl.classList.add('hidden');
         courseModel = null;
+        syncStudyBtn();
         return;
       }
       const m = window.BnCourse.build(meta);
@@ -451,6 +453,7 @@
         courseEl.classList.add('hidden');
         courseModel = null;
         refreshConcepts();
+        syncStudyBtn();
         return;
       }
       courseModel = m;
@@ -472,8 +475,10 @@
       if (nx) courseNextEl.title = '跳到第 ' + nx.index + ' 集：' + nx.title;
       refreshStudy();
       refreshConcepts();
+      syncStudyBtn();
     } catch (e) {
       courseEl.classList.add('hidden');
+      syncStudyBtn();
     }
   }
 
@@ -3213,6 +3218,16 @@
     syncMultiBtn();
   }
 
+  // 「学习页」只在真的读到了课程（合集 / 多 P）时出现。
+  // 之前这段写在 syncMultiBtn 里：syncMeta 那会儿 courseModel 还没建好（refreshCourse 更晚），
+  // 于是按钮一直是 hidden，点都点不到（2026-11-17 真机发现）。
+  function syncStudyBtn() {
+    const sb = $('btnStudy');
+    if (!sb) return;
+    sb.classList.toggle('hidden', !(courseModel && courseModel.id));
+    syncMore();
+  }
+
   // 「导出全部 P」只在真的是合集 / 多 P 时出现：单片视频不该多一个按钮。
   function syncMultiBtn() {
     const b = $('btnMulti');
@@ -3220,7 +3235,7 @@
     const m = state.meta || {};
     const n = Array.isArray(m.pageList) ? m.pageList.length : 0;
     b.classList.toggle('hidden', n < 2);
-    syncMore();
+    syncStudyBtn();
   }
 
   // 失败态一律「说人话 + 你能做什么」。术语（truncated/overflow/rejected）只留在 title 里给排查用。
@@ -3964,11 +3979,20 @@
   });
   document.addEventListener('click', function () { $('more').classList.remove('open'); });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') $('more').classList.remove('open'); });
+  $('btnStudy').addEventListener('click', openStudyPage);
   $('btnDiag').addEventListener('click', copyDiag);
   $('btnVerify').addEventListener('click', function () { boot(true); });
   $('btnHard').addEventListener('click', function () { if (state.hard.active) hardStop('手动停止'); else hardStart(); });
   // 内容脚本里 chrome.runtime.openOptionsPage 是 undefined（2026-11-16 真机实测），只能让后台代开。
   // 之前那句 if (chrome.runtime.openOptionsPage) 永远不成立，面板「设置」按钮点了没反应。
+  // 学习页：整门课一屏。内容脚本开不了扩展页，交给后台 chrome.tabs.create。
+  function openStudyPage() {
+    try {
+      if (chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'openStudy', courseId: courseModel ? courseModel.id : '' });
+      }
+    } catch (e) {}
+  }
   function openSettings() {
     try { if (chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'openOptions' }); } catch (e) {}
   }

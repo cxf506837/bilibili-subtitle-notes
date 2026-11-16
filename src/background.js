@@ -194,6 +194,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })().then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e).slice(0, 200) }));
     return true;
   }
+  if (msg && msg.type === 'openStudy') {
+    // 面板里点「学习页」：内容脚本没有 chrome.tabs，只能让后台开一个扩展页。
+    const cid = String((msg && msg.courseId) || '');
+    const url = chrome.runtime.getURL('src/study.html') + (cid ? '?course=' + encodeURIComponent(cid) : '');
+    try { chrome.tabs.create({ url: url }); } catch (e) {}
+    sendResponse({ ok: true });
+    return true;
+  }
   if (msg && msg.type === 'openOptions') {
     // 内容脚本里没有 chrome.runtime.openOptionsPage（真机实测 undefined），面板的「设置」按钮只能走这里。
     // 先回包再开页：实测先调用时消息口会先关掉，内容脚本只拿到「The message port closed」。
