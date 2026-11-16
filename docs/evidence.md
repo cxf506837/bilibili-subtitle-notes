@@ -531,3 +531,5 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 为什么不用 `:has()` 之外的办法：不动 DOM（掌握度节点还在课程条后面），所以「课程条隐藏时掌握度自己还成立」这条老逻辑不用改；`:has()` 在 Edge 157 / Chrome 105+ 都有，扩展本来就只跑这两家。
 
 顺带的判断：`rows:1` 只显示「已经能讲清」那行是因为测试用的 study-state 里概念名是 `a` / `r`（_lab 造的数据），不是渲染 bug；stream 前四个子元素是 note / note awayn / note / note，也正常。
+
+补一刀（1.4.12）：合并规则一开始写成 `.course:has(+ .mast:not(.hidden))`，没有排除课程条自己隐藏的情况。单视频也有 `courseModel`（kind single、id `video:<BV>`），课程条会被 `.hidden` 掉，但掌握度仍可能显示（course_id 是 `video:<BV>` 的学习状态），那时 `.mast` 会白丢上半圆角并上移 1px。改成 `.course:not(.hidden):has(+ .mast:not(.hidden))`：课程条在才贴。真机复验：系列页仍是 `courseBottom 126 / mastTop 125 / radius 0 / margin -1`。

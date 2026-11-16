@@ -193,8 +193,8 @@
   '.course { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; overflow: hidden; background: var(--bnfill); }',
   '.course.hidden { display: none; }',
   // 课程条和掌握度是同一个东西的两半：贴成一张卡（上半灰底、下半白底），别让面板顶上叠三个横条
-  '.course:has(+ .mast:not(.hidden)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }',
-  '.course:has(+ .mast:not(.hidden)) + .mast { margin-top: -1px; border-top-left-radius: 0; border-top-right-radius: 0; }',
+  '.course:not(.hidden):has(+ .mast:not(.hidden)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }',
+  '.course:not(.hidden):has(+ .mast:not(.hidden)) + .mast { margin-top: -1px; border-top-left-radius: 0; border-top-right-radius: 0; }',
   '.mast { margin: 6px 10px 0; border: 1px solid var(--bnline); border-radius: 6px; background: var(--bnbg); padding: 7px 9px; }',
   '.mast.hidden { display: none; }',
   '.mast .mh { display: flex; align-items: center; gap: 6px; cursor: pointer; }',
