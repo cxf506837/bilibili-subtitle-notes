@@ -70,6 +70,17 @@ a.t:hover { text-decoration:underline; }
 .occRow a.t { flex:none; }
 .occRow .q { color:#41464d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* 学习页内嵌播放器：点「时间戳」就地看这一段，不跳标签页。 */
+.player { position:sticky; top:0; z-index:30; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px; margin:0 0 12px; box-shadow:0 6px 18px rgba(0,0,0,.06); }
+.player.hidden { display:none; }
+.player .pbar { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--sub); margin:0 2px 6px; }
+.player .pwho { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player .pout { color:var(--accent); text-decoration:none; flex:none; }
+.player .pout:hover { text-decoration:underline; }
+.player .pclose { border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 10px; font:inherit; font-size:12px; color:#41464d; cursor:pointer; flex:none; }
+.player .pclose:hover { border-color:var(--accent); color:var(--accent); }
+.player .pframe iframe { display:block; width:100%; aspect-ratio:16/9; border:0; border-radius:6px; background:#000; }
+
 .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:12px; }
 .mastery .line { font-size:15px; font-weight:600; }
 .mastery .when { color:var(--sub); font-size:12px; margin-top:4px; }

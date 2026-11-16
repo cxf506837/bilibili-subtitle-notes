@@ -16,6 +16,7 @@
   let ALL = {};
   let courseId = '';
   let q = '';
+  let EPMAP = {};   // 集号 -> 课程里的那一集（bvid / cid / page / title）
 
   function statusMap(all, id) {
     const raw = all['bnstudy:' + String(id)];
@@ -39,6 +40,47 @@
 
   function jump(url) {
     if (url) window.open(url, '_blank', 'noopener');
+  }
+
+  // 就地看这一段：用 B站 官方播放器 iframe，带上 bvid/cid/page/t。
+  // 真机上 player.bilibili.com 在扩展页里能播（CSP 不拦 iframe，autoplay 也生效）。
+  function playerUrl(ep, t) {
+    return P.playerSrc(EPMAP[Number(ep)] || null, t);
+  }
+
+  function playHere(ep, t, who, fallbackUrl) {
+    const src = playerUrl(ep, t);
+    if (!src) return false;   // 找不到这一集的 bvid：交给调用方走新标签
+    const box = $('player');
+    const frame = $('pframe');
+    const label = $('pwho');
+    const out = $('pout');
+    if (!box || !frame) return false;
+    frame.innerHTML = '';
+    const f = document.createElement('iframe');
+    f.src = src;
+    f.setAttribute('allow', 'autoplay; fullscreen');
+    f.setAttribute('allowfullscreen', '');
+    f.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+    frame.appendChild(f);
+    const e = EPMAP[Number(ep)] || {};
+    label.textContent = (who ? who + ' · ' : '') + CV.fmtClock(t) + (e.title ? ' · ' + e.title : '');
+    if (out) {
+      out.href = fallbackUrl || '';
+      out.style.display = fallbackUrl ? '' : 'none';
+    }
+    box.classList.remove('hidden');
+    // 只在这一块被滚出视口时才把页面拉回来，避免点一下就跳屏
+    const r = box.getBoundingClientRect();
+    if (r.top < 0) box.scrollIntoView({ block: 'start' });
+    return true;
+  }
+
+  function closePlayer() {
+    const frame = $('pframe');
+    const box = $('player');
+    if (frame) frame.innerHTML = '';   // 清掉 iframe，声音才会停
+    if (box) box.classList.add('hidden');
   }
 
   function renderCourses() {
@@ -167,10 +209,16 @@
           const first = occ.list[0];
           const qd = el('div', 'quote');
           const t = el('a', 't', CV.fmtClock(first.t));
-          t.href = first.url ? CV.withT(first.url, first.t) : '#';
+          const href = first.url ? CV.withT(first.url, first.t) : '';
+          t.href = href || '#';
           t.target = '_blank';
           t.rel = 'noopener';
-          if (occ.count > 1) t.title = '第 1 处（共 ' + occ.count + ' 处）';
+          t.title = occ.count > 1
+            ? '在这一页看第 1 处（共 ' + occ.count + ' 处）'
+            : '在这一页看这一段';
+          t.onclick = function (e) {
+            if (playHere(first.ep, first.t, item.name, href)) e.preventDefault();
+          };
           qd.appendChild(t);
           qd.appendChild(document.createTextNode(' ' + (first.quote || '')));
           card.appendChild(qd);
@@ -186,9 +234,14 @@
               if (a.title) lbl.title = a.title;
               row.appendChild(lbl);
               const tk = el('a', 't', CV.fmtClock(a.t));
-              tk.href = a.url ? CV.withT(a.url, a.t) : '#';
+              const thref = a.url ? CV.withT(a.url, a.t) : '';
+              tk.href = thref || '#';
               tk.target = '_blank';
               tk.rel = 'noopener';
+              tk.title = '在这一页看这一段';
+              tk.onclick = function (e) {
+                if (playHere(a.ep, a.t, item.name, thref)) e.preventDefault();
+              };
               row.appendChild(tk);
               row.appendChild(el('span', 'q', a.quote || ''));
               more.appendChild(row);
@@ -232,6 +285,8 @@
       return;
     }
     courseId = course.id;
+    EPMAP = {};
+    ((course && course.episodes) || []).forEach(function (e) { if (e) EPMAP[Number(e.index)] = e; });
     renderCourses();
     renderOverview(course);
     renderEps(course);
@@ -257,6 +312,8 @@
     $('q').value = '';
     render();
   });
+  const pc = $('pclose');
+  if (pc) pc.addEventListener('click', closePlayer);
   $('q').addEventListener('input', function (e) {
     q = String(e.target.value || '');
     const list = P.courses(ALL);

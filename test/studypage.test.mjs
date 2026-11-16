@@ -112,5 +112,17 @@ ok('只有一处的概念不显示「出现在」', soloSum.count === 1 && soloS
 ok('没有锚点时是 0 处', P.occSummary({}).count === 0);
 ok('对 null 安全', P.occurrences(null).length === 0 && P.occSummary(null).count === 0);
 
+// —— 内嵌播放器地址（参数拼错在真机上只表现为「画面不动」） ——
+const src1 = P.playerSrc({ bvid: 'BV1TDGT6vEqC', cid: '42722657079', page: 1 }, 72);
+ok('默认带 autoplay/danmaku/high_quality', src1.indexOf('autoplay=1') > 0 && src1.indexOf('danmaku=0') > 0 && src1.indexOf('high_quality=1') > 0);
+ok('bvid 与 cid 都带上', src1.indexOf('bvid=BV1TDGT6vEqC') > 0 && src1.indexOf('cid=42722657079') > 0);
+ok('t 取整', src1.indexOf('t=72') > 0);
+ok('page=1 不写', src1.indexOf('page=') < 0);
+ok('t<1 不写', P.playerSrc({ bvid: 'BV1' }, 0).indexOf('t=') < 0);
+ok('多 P 才写 page', P.playerSrc({ bvid: 'BV1', page: 3 }, 5).indexOf('page=3') > 0);
+ok('没有 bvid 就没有地址', P.playerSrc({ cid: '1' }, 5) === '');
+ok('null 安全', P.playerSrc(null, 5) === '');
+ok('域名固定 player.bilibili.com', src1.indexOf('https://player.bilibili.com/player.html?') === 0);
+
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

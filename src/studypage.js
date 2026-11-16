@@ -116,6 +116,18 @@
     };
   }
 
+  // 内嵌播放器的地址：只放 B站 官方 player.html 需要的参数（bvid 必有，cid/page 有才带，t 取整）。
+  // 单独拎成纯函数，是因为「参数拼错」在真机上只表现为「画面不动」，日志里看不出来。
+  function playerSrc(ep, t) {
+    const e = ep || null;
+    if (!e || !e.bvid) return '';
+    const qs = ['bvid=' + encodeURIComponent(String(e.bvid)), 'autoplay=1', 'danmaku=0', 'high_quality=1'];
+    if (Number(e.cid)) qs.push('cid=' + encodeURIComponent(String(e.cid)));
+    if (Number(e.page) > 1) qs.push('page=' + Number(e.page));
+    if (Number(t) >= 1) qs.push('t=' + Math.floor(Number(t)));
+    return 'https://player.bilibili.com/player.html?' + qs.join('&');
+  }
+
   // 一个概念在整门课里的所有出现处（同一集里相隔 3 秒内的重复锚点算一处）。
   // 学习页拿它做「出现在 3 集 · 6 处」的展开：每个概念都能顺着引文跳回 B站 那一秒。
   const OCC_GAP = 3;
@@ -180,6 +192,6 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups, occurrences: occurrences, occSummary: occSummary,
+    filterGroups: filterGroups, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });
