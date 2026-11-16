@@ -982,3 +982,20 @@ v0.7.4 第 2 节写「『关闭后继续运行后台扩展和应用』在 Edge 1
 - `src/concepts.js` 的 UMD 尾必须是 `});`，写成 `})();` 会得到 `TypeError: (intermediate value)(...) is not a function`；而仓库 `package.json` 是 `"type":"module"`，`src/*.js` 在 node 里不能直接 `require`，测试统一用 `node:vm` 的 `createContext` + `runInContext`。
 
 真机（ugc_season 8719249，勾 S2-0、S2-1）：24 个概念 / 54 个时间锚点，JSON 23,209 字节，tokens 从 15,912 涨到 21,391（约 5.5k token）。数字与判断见 `docs/evidence.md` 第十四节。
+
+## 2026-11-16 「接着学」：按课程存进度，点图标就能回去
+
+结论：新增 `src/coursestore.js`（纯函数）+ 弹窗第一块「接着学」。每门打开过的课程在 `chrome.storage.local` 里存一条 `bnc:<课程id>`（课程名、kind、每集 bvid/cid/page/标题/时长、updated_at，不存 URL，跳转时现拼）；弹窗按最近打开倒序列出最多 4 行，每行三行字：课程名 / 已看 X/Y · 总时长 · 懂/半懂/没考 / 继续 第 N 集 · 时间。点一下跳回那一集那一秒，不在视频页也能点。
+
+理由：用户要的是「想打开 B站 学习时一下想到这个插件」。原来只有「当前视频」这一个入口——不在视频页时，点图标只能搜索；看过的课没有落脚点。存一份课程级索引，是把这个插件从「视频页的浮层」变成「学习入口」的最小改动，且不需要服务器。
+
+取舍：
+- **不放 cloud / 不跨设备**。PRIVACY 的承诺是只在本机；换电脑会丢，文档写明。
+- **不存 URL**（省地方、也避免域名写死），`episodeUrl()` 现拼 `?p=` 与 `&t=`。
+- **不用 IndexedDB**：弹窗在 `chrome-extension://` 源里读不到 bilibili.com 的 IndexedDB，课程索引必须放在 `chrome.storage.local`（与检索索引 `bnidx:`、学习状态 `bnstudy:` 同一处理）。
+- **每页面只写一次**：`saveCourseRecord()` 用「课程 id + 集数 + 标题」做签名，刷新/翻页不重复写盘；`updated_at` 由调用时给，用于「最近在看」排序。
+- **写完不美化**：没有集的坏记录直接过滤，不做自动清理（磁盘里 10 个 `bnc:<cid>` 旧键保留，避免动用户数据）。
+
+真机验证（v1.4.4，`dist\edge-profile` 已登录）：打开 BV1BgH36DE7y → 写入 `bnc:season:8719249`（24 集）；弹窗显示「已看 2/24 · 2 小时 57 分 · 懂 5 · 半懂 11 · 没考 75 / 继续 第 2 集 · 0:15」；点该行真跳到 `BV1VrGu6JEqk?t=15`。详见 docs/evidence.md 第十八节。
+
+踩坑：`BnStudyState.fromStorage()` 返回 `{key, state}` 包装，弹窗直接传给 `BnCourseStore.list()` 导致掌握度永远为空（界面表现只是「少了一段字」）。修在 `masteryOf`：`const s = raw.state || raw`，并补两条断言。教训：**两个模块的返回形状不同时，调用点是最容易沉默出错的地方**——这类 bug 不会抛异常，只会少一块信息。

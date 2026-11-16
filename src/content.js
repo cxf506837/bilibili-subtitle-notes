@@ -321,6 +321,23 @@
     } catch (e) {}
   }
 
+  // 把课程存一份「看过什么、看到哪」，供工具栏弹窗（不在视频页时）列「接着学」。
+  // 同一页面只写一次；换集/换课会重新写，时间戳因此就是「最近在看」。
+  let courseSavedSig = '';
+  function saveCourseRecord(m) {
+    try {
+      if (!m || !window.BnCourseStore) return;
+      const sig = m.id + '|' + m.episodes.length + '|' + (m.title || '');
+      if (sig === courseSavedSig) return;
+      courseSavedSig = sig;
+      const rec = window.BnCourseStore.record(m);
+      if (!rec) return;
+      const obj = {};
+      obj[rec.key] = rec.value;
+      chrome.storage.local.set(obj);
+    } catch (e) {}
+  }
+
   function saveCourseProgress(t) {
     const m = state.meta;
     if (!m || !m.cid || !window.BnCourse) return;
@@ -359,6 +376,7 @@
         return;
       }
       courseModel = m;
+      saveCourseRecord(m);
       const pr = window.BnCourse.progress(m, courseProgress);
       courseLastWatched = pr.watched;
       courseCur = window.BnCourse.currentIndex(m, state.bvid, meta.cid);

@@ -105,6 +105,36 @@
   }
 
 
+  // ---- 接着学：把看过的课程列出来，一键回到上次那一集那一秒 ----
+  const CS = window.BnCourseStore;
+  const coursesEl = document.getElementById('courses');
+  const coursesMeta = document.getElementById('coursesMeta');
+  const courseRows = document.getElementById('courseRows');
+
+  function renderCourses(all) {
+    if (!CS) { coursesEl.hidden = true; return; }
+    const studies = (S ? S.fromStorage(all) : []);
+    const rows = CS.list(all, studies, 4).filter(function (r) { return r.next || r.mastery; });
+    if (!rows.length) { coursesEl.hidden = true; return; }
+    coursesMeta.textContent = rows.length + ' 门课';
+    let html = '';
+    rows.forEach(function (r) {
+      const done = !r.next;
+      html += '<button class="crow' + (done ? ' done' : '') + '" data-url="' + esc(r.next ? r.next.url : '') + '" title="' + esc(r.title) + '">' +
+        '<span class="crt">' + esc(r.title || '未命名课程') + '</span>' +
+        '<span class="crm">' + esc(CS.metaLine(r)) + '</span>' +
+        '<span class="crn">' + esc(CS.nextLine(r)) + '</span>' +
+        '</button>';
+    });
+    courseRows.innerHTML = html;
+    courseRows.querySelectorAll('.crow').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (el.dataset.url) openUrl(el.dataset.url);
+      });
+    });
+    coursesEl.hidden = false;
+  }
+
   // ---- 学习状态：agent 拷打完把 study-state.json 复制到剪贴板，点图标就能应用 ----
   const S = window.BnStudyState;
   const studyEl = document.getElementById('study');
@@ -270,6 +300,7 @@
 
   chrome.storage.local.get(null, function (all) {
     entries = B.fromStorage(all);
+    renderCourses(all);
     renderRecent();
     renderCurrent();
     readClipboardStudy(all);
