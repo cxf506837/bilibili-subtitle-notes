@@ -1,6 +1,6 @@
 # B站字幕笔记
 
-[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 572 条离线测试 · MIT
+[![test](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml/badge.svg)](https://github.com/cxf506837/bilibili-subtitle-notes/actions/workflows/test.yml) 584 条离线测试 · MIT
 
 跟播放头边看边写；每条结论都带**逐字引文 + 可点的时间**，点一下跳回原句。浏览器扩展（Edge / Chrome，MV3）。
 
@@ -20,7 +20,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - 拿不准就说拿不准：「两次取样一致」只说明取样稳定，不说明内容是这个视频的，所以界面不写"已验证"
 - 你填的 API Key 只在本机，直连你自己填的端点，没有中间服务器
 
-实测数据（60 条视频可用率、8 次取样 4 种文件、572 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
+实测数据（60 条视频可用率、8 次取样 4 种文件、584 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
 ## 装（约 3 分钟）
 
@@ -46,7 +46,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 - **没填 API Key 也能用**：抓完字幕直接点「导出」，拿到的是逐句字幕全文（每句一个时间戳、可点回原句），只是没有 AI 整理的结论
 - 关掉页面再打开，笔记从 IndexedDB 原样恢复，不重跑闸门、不重复花钱
 - 失败会说清是哪一种：没有字幕 / 字幕只有一部分 / 字幕和视频对不上 / 没登录 / 清晰度太低 …
-- **点扩展图标 = 搜你攒下的所有笔记**：输入关键词（空格分隔多个词，多个词同时命中才算）或人名，结果显示在哪个视频的哪一秒，点一下直接跳回那一句的原时间点
+- **点扩展图标**：顶上第一行就是「当前视频 · 已经攒了 N 条笔记 → 打开面板」—— 面板收起来了、或者刚装好不知道从哪开始，点它就回去；下面才是「搜你攒下的所有笔记」，输入关键词（空格分隔多个词，多个词同时命中才算）或人名，结果显示在哪个视频的哪一秒，点一下直接跳回那一句的原时间点
 - 「诊断」按钮一直在（不是只有出错才出现）：一键拿到版本 / 页面 / 字幕判定 / 端点（不含 Key），贴进 issue 就能复现；状态条不是绿色时会高亮
 
 ## 不做
@@ -62,7 +62,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 ## 开发
 
 ```bash
-node test/run-all.mjs             # 572 条离线测试，不需要网络、不花钱
+node test/run-all.mjs             # 584 条离线测试，不需要网络、不花钱
 node test/preview-server.mjs 8799 # 预览页 http://127.0.0.1:8799/video/BV1TESTPREVIEW
 node test/zip.mjs [--lite]        # 打包
 ```

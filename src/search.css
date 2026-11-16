@@ -56,3 +56,22 @@ body {
 .btn.primary { border-color: #00aeec; color: #0091c5; background: rgba(0,174,236,.1); font-weight: 600; }
 .btn[disabled] { opacity: .5; cursor: default; }
 .ft .btn:first-child { flex: 1; }
+
+/* 当前视频：点图标第一眼就要看到「怎么进面板」，不然新人以为这里就是全部 */
+.cur {
+  display: flex; gap: 10px; align-items: center;
+  margin: 10px 14px 0; padding: 10px; border-radius: 8px;
+  background: #f6f7f8; border: 1px solid #e3e5e7;
+}
+.cur[hidden] { display: none; }
+.cur .cw { flex: 1; min-width: 0; }
+.cur .ct {
+  font-size: 13px; font-weight: 600; color: #18191c;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cur .cm {
+  font-size: 11px; color: #9499a0; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cur .btn { flex: 0 0 auto; white-space: nowrap; }
+.cur.has .ct { color: #0091c5; }

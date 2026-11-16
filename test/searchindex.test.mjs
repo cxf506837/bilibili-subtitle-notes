@@ -98,5 +98,21 @@ const noTitle = B.build('BV1bare411c7mG', { cid: 1 }, []);
 ok('没标题时用 bvid', noTitle.title === 'BV1bare411c7mG');
 ok('没有笔记也能建索引', noTitle.count === 0 && Array.isArray(noTitle.notes));
 
+const otherP = B.build('BV1xx411c7mD', { title: '同一个视频的第三讲', cid: 89, page: 3, pages: 6, part: '第三讲', updated: 1 }, notes);
+
+// 弹窗顶部「当前在看哪一集」：从地址认 bvid / 分 P，挑回对应索引
+ok('从视频页地址取 bvid', B.bvidOf('https://www.bilibili.com/video/BV1xx411c7mD/?spm_id_from=333') === 'BV1xx411c7mD');
+ok('从 ?p= 地址取 bvid', B.bvidOf('https://www.bilibili.com/video/BV1xx411c7mD?p=3') === 'BV1xx411c7mD');
+ok('不是视频页就没有 bvid', B.bvidOf('https://www.bilibili.com/') === '');
+ok('搜索页不算视频页', B.bvidOf('https://search.bilibili.com/all?keyword=BV1xx411c7mD') === '');
+ok('取分 P 号', B.pageOf('https://www.bilibili.com/video/BV1xx411c7mD?p=3') === 3);
+ok('没有 p 就是 0（当成整片）', B.pageOf('https://www.bilibili.com/video/BV1xx411c7mD/') === 0);
+ok('pickEntry 优先同一分 P', B.pickEntry([idx, otherP], 'BV1xx411c7mD', 2) === idx);
+ok('pickEntry 分 P 对不上就退最近一条', B.pickEntry([idx, otherP], 'BV1xx411c7mD', 5).bvid === 'BV1xx411c7mD');
+ok('pickEntry 没这个视频就 null', B.pickEntry([idx], 'BV9zz', 1) === null);
+ok('标题去掉站点后缀', B.cleanTitle('某个视频_哔哩哔哩_bilibili', 'BV1') === '某个视频');
+ok('标题去掉短后缀', B.cleanTitle('某个视频 - 哔哩哔哩', 'BV1') === '某个视频');
+ok('空标题退回 bvid', B.cleanTitle('', 'BV1xx') === 'BV1xx');
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

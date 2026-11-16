@@ -129,6 +129,33 @@
     return order.map(function (k) { return map[k]; });
   }
 
+  // 从 B站 视频页地址里认当前在看哪一集（弹窗顶上「继续上次」要用）
+  function bvidOf(url) {
+    const m = String(url == null ? '' : url).match(/\/video\/(BV[0-9A-Za-z]{8,})/);
+    return m ? m[1] : '';
+  }
+  function pageOf(url) {
+    const m = String(url == null ? '' : url).match(/[?&]p=(\d+)/);
+    return m ? Math.max(0, Number(m[1]) || 0) : 0;
+  }
+  // 优先给同一分 P 的那条，没有就退同一视频的第一条（多 P 视频点图标也能进来）
+  function pickEntry(entries, bvid, page) {
+    if (!bvid) return null;
+    const same = (entries || []).filter(function (e) { return e && e.bvid === bvid; });
+    if (!same.length) return null;
+    if (page) {
+      const exact = same.filter(function (e) { return Number(e.page) === Number(page); });
+      if (exact.length) return exact.sort(function (a, b) { return (b.updated || 0) - (a.updated || 0); })[0];
+    }
+    return same.sort(function (a, b) { return (b.updated || 0) - (a.updated || 0); })[0];
+  }
+  // 标签页标题 -> 干净的视频标题（B站 的 tab.title 结尾总带站点名）
+  function cleanTitle(title, fallback) {
+    let s = String(title == null ? '' : title).trim();
+    s = s.replace(/[_\-|]\s*哔哩哔哩.*$/, '').replace(/[_\-|]\s*bilibili.*$/i, '').trim();
+    return s || String(fallback || '');
+  }
+
   const api = {
     PREFIX: PREFIX,
     build: build,
@@ -139,6 +166,10 @@
     groupVideos: groupVideos,
     trim: trim,
     tokens: tokens,
+    bvidOf: bvidOf,
+    pageOf: pageOf,
+    pickEntry: pickEntry,
+    cleanTitle: cleanTitle,
   };
   if (typeof window !== 'undefined') window.BnIndex = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

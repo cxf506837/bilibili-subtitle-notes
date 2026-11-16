@@ -8,6 +8,11 @@
   const list = document.getElementById('list');
   const meta = document.getElementById('meta');
   const scope = document.getElementById('scope');
+  const curEl = document.getElementById('cur');
+  const curTitle = document.getElementById('curTitle');
+  const curMeta = document.getElementById('curMeta');
+  const curBtn = document.getElementById('curBtn');
+  const openPanelBtn = document.getElementById('openPanel');
 
   let entries = [];
 
@@ -56,6 +61,49 @@
     });
   }
 
+  // 当前标签页是不是 B站 视频页，是就把「进面板」摆在第一行
+  function renderCurrent() {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      const tab = tabs && tabs[0];
+      const url = (tab && tab.url) || '';
+      const bv = B.bvidOf(url);
+      if (!bv) {
+        curEl.hidden = true;
+        openPanelBtn.hidden = false;
+        if (/^https:\/\/www\.bilibili\.com\//.test(url)) {
+          curMeta.textContent = '';
+        }
+        return;
+      }
+      const page = B.pageOf(url);
+      const hit = B.pickEntry(entries, bv, page);
+      const name = hit && hit.title ? hit.title : B.cleanTitle(tab.title, bv);
+      // 合集里 part 常常就是本集标题，别再拼一遍
+      const part = hit && hit.part && hit.part !== hit.title ? hit.part : '';
+      curTitle.textContent = part ? name + ' · ' + part : name;
+      curTitle.title = curTitle.textContent;
+      if (hit && hit.count) {
+        curEl.classList.add('has');
+        curMeta.textContent = '继续上次 · 已经攒了 ' + hit.count + ' 条笔记';
+      } else {
+        curEl.classList.remove('has');
+        curMeta.textContent = '这个视频还没整理过 · 不填 API Key 也能导出字幕全文';
+      }
+      curEl.hidden = false;
+      openPanelBtn.hidden = true;
+      curBtn.onclick = function () {
+        if (!tab || tab.id == null) return;
+        chrome.tabs.sendMessage(tab.id, { type: 'bnOpenPanel' }, function () {
+          if (chrome.runtime.lastError) {
+            curMeta.textContent = '面板还没在这儿加载好，刷新一下页面再点';
+            return;
+          }
+          window.close();
+        });
+      };
+    });
+  }
+
   function renderRecent() {
     const rec = B.recent(entries, 10);
     const totalNotes = entries.reduce(function (a, e) { return a + (e.count || 0); }, 0);
@@ -64,7 +112,7 @@
       : '在你的 B站 笔记里搜';
     meta.textContent = '';
     if (!rec.length) {
-      list.innerHTML = '<div class="empty">还没有笔记可搜。<br><br>去任意 B站 视频页，右侧面板会自己出来；点「总结这段」攒下几条笔记后，这里就能搜到。<br><br><b>不填 API Key 也能用</b>：面板上的「导出」能直接导出字幕全文。</div>';
+      list.innerHTML = '<div class="empty">还没有笔记可搜。<br><br>去任意 B站 视频页，右侧面板会自己出来（收起来了就点上面的按钮）。点「总结这段」攒下几条笔记后，这里就能搜到。<br><br><b>不填 API Key 也能用</b>：面板上的「导出」能直接导出字幕全文。</div>';
       return;
     }
     let html = '';
@@ -143,6 +191,7 @@
   chrome.storage.local.get(null, function (all) {
     entries = B.fromStorage(all);
     renderRecent();
+    renderCurrent();
     q.focus();
   });
 })();

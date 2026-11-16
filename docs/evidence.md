@@ -121,7 +121,7 @@ deepseek-flash，真实字幕 `BV1GyZYYNErW`（2132 句 / 25311 字 / 70 分钟 
 
 变异测试：把 `src/options.js` 里两道 `if (!allow.ok) return show(originError(allow), true);` 删掉后重跑 `test/options.test.mjs`，6 条变红；恢复后 21 条全绿。
 
-`node test/run-all.mjs` 现在 **309 条断言**（gate 40 / vote 10 / pages 15 / section 25 / visual 9 / hardsub 61 / pipeline 11 / endpoint 30 / options 21 / transcript 27 / diag 20 / realdata 40），不需要网络、不花钱。
+`node test/run-all.mjs` 现在 **584 条断言**（gate 40 / vote 10 / pages 15 / section 25 / visual 9 / hardsub 61 / pipeline 11 / endpoint 30 / options 21 / transcript 30 / batch 28 / diag 20 / chat 18 / searchindex 45 / course 50 / season 17 / concepts 34 / study 35 / studyplan 45 / realdata 40）。
 ## 八、没配 API Key 也能拿到字幕全文（W2-3）
 
 为什么要有这条：闸门跑完的那一刻，字幕已经在手里了，但以前只有模型返回之后才有「笔记」，所以没填 Key 的用户点「导出」得到的是一份只有标题和 BV 号的空文件——看起来像产品坏了。
@@ -211,6 +211,18 @@ bili-notes 1.0.0 · 2026-11-14T12:28:29.839Z
 
 检索索引是完整笔记的**精简副本**（每条只留摘要/一句结论/引文片段），放在 `chrome.storage.local`；完整笔记仍在 bilibili.com 站点的 IndexedDB 里——扩展弹窗属于 `chrome-extension://` 源，读不到站点库，所以才需要这份副本。
 
+### 点图标的入口（2026-11-16 真机）
+
+面板收起来之后，新人第一反应是点扩展图标；以前弹出的是**一个空搜索框**，看不出还能进面板。现在弹窗顶上第一行是当前视频卡片。
+
+| 场景 | 实测 |
+|---|---|
+| 已整理过的视频（BV1BgH36DE7y） | 卡片「继续上次 · 已经攒了 15 条笔记」+「打开面板」，点它后面板从 52px 收起态变回 399px |
+| 没整理过的视频（BV1yt4B6QEfs） | 卡片显示视频标题 +「这个视频还没整理过 · 不填 API Key 也能导出字幕全文」 |
+| 不在视频页（B站 首页） | 卡片隐藏，底部「打开当前视频的面板」按钮保留（点了会提示先打开视频） |
+
+验证方式：CDP 调 `chrome.action.openPopup()` 打开真弹窗（不是把 search.html 当普通标签页开），`chrome.runtime.getManifest().version` = 1.4.1。
+
 ## 十一、全新机器从 GitHub clone 直接加载（2026-11-15 实测）
 
 模拟陌生人：`git clone --depth 1` 到临时目录（**不带** `.git` 里的历史、不带 `dist/`），用全新的空 profile 启动 Edge，`--load-extension` 指向 clone 出来的目录。
@@ -235,7 +247,7 @@ v1.1.0 加了三件 v1.0.1 没有的东西：多 P 一键导出、Markdown 带 `
 | 100 P 视频 `BV1ezW162EDt` | 能跑、能停：跑到「2/100」时再点一次按钮（此时文案是「停止导出」），状态条变成「已停止：导出了 2/100 P（1 P 两次取样一致）」，按钮复位 |
 | 单 P 视频 `BV1GyZYYNErW` | `btnMulti` 是隐藏的（只有一个 P 不显示）；`__bnMarkdown()` 92,187 字节，frontmatter 有 `bvid` + `tags`（bilibili、视频笔记），正文 `## 大纲` 段首行是「- [0:00](…) 恩迪是铁傀儡祖先…」 |
 | `诊断` 按钮 | 状态条绿色时也在（v1.0.1 这时是隐藏的），文案从「复制诊断」改成「诊断」；warn/bad 时加 `accent` 高亮 |
-| 离线测试 | 433 条（batch 28、transcript 4、chat 18、searchindex 33） |
+| 离线测试 | 584 条（batch 28、transcript 4、chat 18、searchindex 33、course 50、season 17、concepts 34、study 35、studyplan 45） |
 
 两个当时的判断，写下来免得以后以为是 bug：
 
