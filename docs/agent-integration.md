@@ -8,7 +8,26 @@
 这份包不是「视频摘要」。它是**结构 + 锚点**：哪几集、每集多久、字幕可不可信、每个概念在第几集第几秒被讲到、原话是什么。
 有了它，agent 不用看视频，也能知道自己该让学生学什么、从哪一段开始讲、讲完怎么考。
 
-**文件在哪**：浏览器只肯把下载写到下载目录（Windows 是 `%USERPROFILE%\Downloads`，macOS 是 `~/Downloads`），扩展拿不到绝对路径。所以导出完它会顺手把一句话放进剪贴板：「我刚用「B站字幕笔记」导出了学习包「<文件名>.json」…先找到这个文件…找不到就问我路径」——用户把这句话粘给 agent 就是完整交接。没粘上就点扩展图标，最上面有「学习包已导出 · 复制给 agent 的话」。
+**文件在哪**：浏览器只肯把下载写到下载目录（Windows 是 `%USERPROFILE%\Downloads`，macOS 是 `~/Downloads`），扩展拿不到绝对路径。
+所以文件名固定以 **`bn-study-`** 开头，扩展导出完还会顺手把这句话放进剪贴板：
+
+> 我刚用「B站字幕笔记」导出了学习包，文件名以 bn-study- 开头…在浏览器下载目录里找**最新的** `bn-study-*.json`（浏览器给重名文件会加「 (1)」，所以认「前缀 + 最新」，别按精确文件名找；一个都没有就问我路径，别猜）。读之前确认 spec 是 `bn-study-pack/1`…
+
+用户把这句话粘给 agent 就是完整交接。没粘上就点扩展图标，最上面有「学习包已导出 · 复制给 agent 的话」。
+
+一句话版：**「读下载目录里最新的 bn-study-*.json，按我的目标裁剪」**——以后连文件名都不用说。
+
+### 想连「把窗口切过去」都省掉
+
+仓库 `tools/agent-bridge/` 有个 Windows 小助手：它盯下载目录，`bn-study-*.json` 一落盘就把 agent 窗口拉到前面。
+它**不点击、不输入、不发送**——你的动作只剩 `Ctrl+V`（提示词已在剪贴板）→ `Enter`。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/agent-bridge/install.ps1              # 装进开机启动
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/agent-bridge/install.ps1 -Uninstall  # 卸掉
+```
+
+为什么不做「自动发送」：本机 DSH 的 web 接口要鉴权（无 token 一律 401），要么去捞 token、要么做 UI 自动化，两者都会在你没看着的时候替你按下回车。停在「窗口到前面、文字在剪贴板」既稳又不会误发。详见 [tools/agent-bridge/README.md](../tools/agent-bridge/README.md)。
 
 ## 1. 顶层结构
 

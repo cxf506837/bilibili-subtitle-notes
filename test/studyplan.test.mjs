@@ -1,5 +1,8 @@
 // 学习包工具（agent 侧）：切词 / 打分 / 裁剪 / 救回 / 图 / 状态机
-import { tokenize, scoreConcept, plan, mermaid, markdown, stateInit, stateMark, summarize, PACK_SPEC, STATE_SPEC } from '../skills/bili-study/tools/study.mjs';
+import { tokenize, scoreConcept, plan, mermaid, markdown, stateInit, stateMark, summarize, safeDirName, outDirFor, ensureDir, PACK_SPEC, STATE_SPEC } from '../skills/bili-study/tools/study.mjs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 let pass = 0, fail = 0;
 const eq = (a, b, msg) => {
@@ -103,5 +106,21 @@ throws(() => plan({ spec: 'bn-study-pack/9' }), '不认识的 pack 版本要抛�
 eq(plan(pack([])).stats.total, 0, '空概念不崩');
 eq(plan(pack([])).mermaid, '', '空概念没有图');
 
+
+// 输出目录：早先 --out 指到不存在的目录直接 ENOENT，工具不自己建。
+eq(safeDirName('【从零开始的 AI 学习】'), '【从零开始的 AI 学习】', '中文书名号保留');
+eq(safeDirName('a/b\\c:d'), 'a_b_c_d', 'Windows 非法字符换成下划线');
+eq(safeDirName(''), 'study', '空名字兜底');
+eq(safeDirName('   '), 'study', '纯空白也算空');
+eq(outDirFor({ course: { title: '测试课' } }, ''), join('study', '测试课'), '不给 --out 就落到 ./study/<课程名>');
+eq(outDirFor({ course: { title: '测试课' } }, 'D:/x/y'), 'D:/x/y', '给了 --out 就用它');
+eq(outDirFor({}, ''), join('study', 'study'), '包里没课程名也不崩');
+const tmpBase = mkdtempSync(join(tmpdir(), 'bn-out-'));
+const deep = join(tmpBase, 'a', 'b', 'c');
+eq(existsSync(deep), false, '目录还不存在');
+eq(ensureDir(deep), deep, 'ensureDir 返回路径');
+eq(existsSync(deep), true, 'ensureDir 真的建出来了（含父级）');
+eq(ensureDir(''), '', '空目录名原样返回');
+rmSync(tmpBase, { recursive: true, force: true });
 console.log('studyplan: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

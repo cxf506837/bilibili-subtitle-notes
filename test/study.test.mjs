@@ -76,7 +76,8 @@ ok('md 分集字幕标注取样稳定度', md.indexOf('两次取样一致') >= 0
 ok('md 笔记带时间戳', md.indexOf('  - 7:22 测试是 AI 改代码的底气') >= 0);
 ok('md 空笔记给的是人话', md.indexOf('这一集还没整理（只验证了字幕）') >= 0);
 ok('md 有没导出的集与原因', md.indexOf('## 没导出的集（1）') >= 0 && md.indexOf('这一 P 没有中文 AI 字幕') >= 0);
-ok('文件名带课程名/范围/集数', pack.baseName === '【从零开始的 AI 学习】（S2 · 2 集学习包）', pack.baseName);
+ok('文件名带固定前缀/课程名/范围/集数', pack.baseName === 'bn-study-【从零开始的 AI 学习】（S2 · 2 集学习包）', pack.baseName);
+ok('前缀是为了让 agent 按「最新 + 前缀」找', pack.baseName.indexOf('bn-study-') === 0, pack.baseName);
 
 // 边界
 const bare = S.build({});

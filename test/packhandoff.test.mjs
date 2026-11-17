@@ -28,8 +28,8 @@ ok('空名字有兜底', H.names('').json === 'bilibili-course.json', H.names(''
 const base = '【从零开始的 AI 学习】（S2 · 9 集学习包）';
 const t = H.text({ baseName: base, course: '【从零开始的 AI 学习】', scope: 'S2', episodes: 9, goal: '三周内能独立用 agent 跑通一个自动化任务' });
 ok('带上了 json 文件名', t.indexOf(base + '.json') >= 0, t);
-ok('带上了 md 文件名', t.indexOf(base + '.md') >= 0, t);
-ok('说了找不到就问用户', t.indexOf('找不到就问我') >= 0, t);
+ok('提到同目录还有 md（现在是同名 .md，不再逐个点名）', t.indexOf('同名 .md') >= 0, t);
+ok('说了找不到就问用户', t.indexOf('问我路径') >= 0, t);
 ok('说了默认在下载目录', t.indexOf('Downloads') >= 0, t);
 ok('要求校验 spec', t.indexOf('bn-study-pack/1') >= 0, t);
 ok('点了 bili-study 这个 skill', t.indexOf('bili-study') >= 0, t);
@@ -67,6 +67,15 @@ const back = H.parsePending({ baseName: base, course: 'C', text: t, at: '2026-11
 ok('好数据能读回来', back && back.text === t && back.jsonName === base + '.json', back);
 ok('读回来时也算「没复制过」', back && H.shouldAutoCopy(back) === true, back);
 
+// 5b. 文件名有固定前缀，提示里教 agent「按前缀找最新」而不是精确名字
+ok('前缀常量', H.PREFIX === 'bn-study-', H.PREFIX);
+ok('通配符常量', H.PATTERN === 'bn-study-*.json', H.PATTERN);
+const withPrefix = H.text({ baseName: 'bn-study-测试课（S1 · 2 集学习包）', course: '测试课', episodes: 2 });
+ok('提示里点名通配符', withPrefix.indexOf('bn-study-*.json') >= 0, withPrefix);
+ok('提示里说「最新的」', withPrefix.indexOf('最新的') >= 0, withPrefix);
+ok('提示里交代 (1) 重名', withPrefix.indexOf('(1)') >= 0, withPrefix);
+ok('仍然要求校验 spec', withPrefix.indexOf('bn-study-pack/1') >= 0, withPrefix);
+ok('没有绝对路径就不会骗人', withPrefix.indexOf('C:') < 0 && withPrefix.indexOf('\\Users') < 0, withPrefix);
 // 6. 长文本不会无限膨胀（剪贴板里塞几万字不合适）
 const long = H.text({ baseName: base, course: 'C', goal: new Array(400).join('很长的目标') });
 ok('文本有上限', long.length <= H.MAX_TEXT + 1, long.length);

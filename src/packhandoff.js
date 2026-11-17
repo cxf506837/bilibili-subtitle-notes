@@ -11,6 +11,9 @@
 
   const KEY = 'bn.packLast';
   const MAX_TEXT = 2000;
+  // 所有学习包文件名都以这个开头（见 study.js 的 baseName），agent 只认「最新 + 前缀」。
+  const PREFIX = 'bn-study-';
+  const PATTERN = PREFIX + '*.json';
 
   function str(v) { return String(v == null ? '' : v).trim(); }
   function num(v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n) : 0; }
@@ -27,21 +30,20 @@
     return '目标：' + g;
   }
 
-  // 一句里要带上：文件名、找不到怎么办、先校验 spec，然后才是我要的东西。
-  // 「找不到就问我」是故意写的：扩展拿不到绝对路径，硬写一个路径反而会骗人。
+  // 一句里要带上：找哪个文件（按前缀找最新）、找不到怎么办、先校验 spec，然后才是目标。
+  // 不写死绝对路径：扩展拿不到下载目录的真实路径，硬写一个反而会骗人。
   function text(o) {
     o = o || {};
     const n = names(o.baseName);
     const course = str(o.course) || '这门课';
     const eps = num(o.episodes);
     const scope = str(o.scope);
-    const head = '我刚用「B站字幕笔记」导出了学习包「' + n.json + '」（同目录还有「' + n.md + '」，是给人看的版本）。';
-    const ask = '请用 bili-study 带我学这门课：先找到这个文件（默认在浏览器下载目录，Windows 是 %USERPROFILE%\\Downloads，macOS 是 ~/Downloads；找不到就问我路径，别猜），读之前确认 spec 是 bn-study-pack/1，然后按下面的目标裁剪、出依赖图和学习顺序，再用逐字原话考我。';
+    const head = '我刚用「B站字幕笔记」导出了学习包，文件名以 ' + PREFIX + ' 开头，本次是「' + n.json + '」（同目录还有同名 .md，是给人看的版本）。';
+    const ask = '请用 bili-study 带我学这门课：先找到这个文件——在浏览器下载目录里找最新的 ' + PATTERN + '（Windows 是 %USERPROFILE%\\Downloads，macOS 是 ~/Downloads；浏览器给重名文件会加「 (1)」，所以认「前缀 + 最新」，别按精确文件名找；一个都没有就问我路径，别猜）。读之前确认 spec 是 bn-study-pack/1，然后按下面的目标裁剪、出依赖图和学习顺序，再用逐字原话考我。';
     const meta = '课程：' + course + (scope ? '（' + scope + ' · ' + (eps ? eps + ' 集' : '若干集') + '）' : (eps ? '（' + eps + ' 集）' : ''));
     const out = [head, ask, meta, goalLine(o.goal)].join('\n');
     return out.slice(0, MAX_TEXT);
   }
-
   function record(o) {
     o = o || {};
     const n = names(o.baseName);
@@ -84,6 +86,8 @@
   return {
     KEY: KEY,
     MAX_TEXT: MAX_TEXT,
+    PREFIX: PREFIX,
+    PATTERN: PATTERN,
     names: names,
     text: text,
     record: record,

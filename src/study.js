@@ -192,7 +192,9 @@
       });
       md.push('');
     }
-    const base = safeName(doc.course.title, 'bilibili-course') + ('（' + (doc.scope ? doc.scope + ' · ' : '') + doc.counts.episodes + ' 集学习包）');
+    // 固定前缀 bn-study- ：agent 那边就可以「找下载目录里最新的 bn-study-*.json」，
+    // 不用猜完整文件名（浏览器给重名文件会加「 (1)」）。
+    const base = 'bn-study-' + safeName(doc.course.title, 'bilibili-course') + ('（' + (doc.scope ? doc.scope + ' · ' : '') + doc.counts.episodes + ' 集学习包）');
     return {
       spec: SPEC,
       doc: doc,

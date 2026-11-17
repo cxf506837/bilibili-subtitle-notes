@@ -601,7 +601,7 @@
       packBtn.type = 'button';
       packBtn.className = 'btn sm cpack';
       packBtn.textContent = '交给 agent';
-      packBtn.title = '导出学习包（JSON + Markdown）：课程结构 + 笔记 + 概念卡，格式见 docs/agent-integration.md';
+      packBtn.title = '导出学习包（JSON + Markdown）并把「交给 agent」那句话放进剪贴板；文件名以 bn-study- 开头，agent 按最新那个找。格式见 docs/agent-integration.md';
       packBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
         makeStudyPack();
@@ -897,7 +897,7 @@
           }
         } catch (e) { packCopied = false; }
         packTip = packCopied
-          ? '交给 agent 的那句话已复制：去 agent 里粘一下'
+          ? '「交给 agent」的话已复制：去 agent 里粘一下就行（文件在下载目录，bn-study- 开头）'
           : '点扩展图标，可一键复制「交给 agent 的话」';
       }
       setStatus(bad.length ? 'warn' : 'ok',

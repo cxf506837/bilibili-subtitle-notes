@@ -3,7 +3,7 @@
 //   node study.mjs plan <学习包.json> [--goal "…"] [--keep 12] [--out <目录>]
 //   node study.mjs state <学习包.json> [--goal "…"] [--out <目录>]
 //   node study.mjs mark <study-state.json> <概念名> <understood|shaky|unknown> [--quote "…"] [--url "…"]
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const PACK_SPEC = 'bn-study-pack/1';
@@ -232,6 +232,26 @@ export function summarize(state) {
   return '懂 ' + (p.understood || 0) + ' / 半懂 ' + (p.shaky || 0) + ' / 没考 ' + (p.unknown || 0) + '，共 ' + (p.total || 0);
 }
 
+// ---------- 输出目录 ----------
+// 早先 --out 指到不存在的目录会直接 ENOENT（工具没自己建）——这里统一兜住。
+// 不给 --out 时默认 ./study/<课程名>，因为 agent 的 cwd 经常是仓库根，不想到处丢文件。
+export function safeDirName(s) {
+  const t = String(s == null ? '' : s).replace(/[\\/:*?"<>|\r\n\t]+/g, '_').replace(/^[.\s]+|[.\s]+$/g, '');
+  return t.slice(0, 80) || 'study';
+}
+export function outDirFor(pack, out) {
+  const given = String(out == null ? '' : out).trim();
+  if (given) return given;
+  const title = pack && pack.course && pack.course.title ? pack.course.title : '';
+  return join('study', safeDirName(title));
+}
+export function ensureDir(dir) {
+  const d = String(dir == null ? '' : dir).trim();
+  if (!d) return '';
+  if (!existsSync(d)) mkdirSync(d, { recursive: true });
+  return d;
+}
+
 // ---------- CLI ----------
 const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').slice(-1)[0]);
 if (isMain) {
@@ -241,17 +261,23 @@ if (isMain) {
   try {
     if (cmd === 'plan' || cmd === 'state') {
       const pack = JSON.parse(readFileSync(file, 'utf8'));
-      const pl = plan(pack, { goal: opt('goal', ''), keep: opt('keep', 0) });
-      const outDir = opt('out', '');
+      const goalOpt = opt('goal', '');
+      const pl = plan(pack, { goal: goalOpt, keep: opt('keep', 0) });
+      const outDir = ensureDir(outDirFor(pack, opt('out', '')));
+      const noGoal = !String(goalOpt || (pack && pack.goal) || '').trim();
       if (cmd === 'plan') {
         const md = markdown(pl);
+        if (noGoal) process.stdout.write('[study] 没给目标（--goal 为空、包里 goal 也为空）：这次没有裁剪，' + pl.kept.length + ' 个概念全留。想要裁剪就把目标补上。\n');
         process.stdout.write(md);
-        if (outDir) { writeFileSync(join(outDir, 'plan.md'), md); writeFileSync(join(outDir, 'plan.json'), JSON.stringify(pl, null, 2)); }
+        writeFileSync(join(outDir, 'plan.md'), md);
+        writeFileSync(join(outDir, 'plan.json'), JSON.stringify(pl, null, 2));
+        process.stdout.write('[study] 已写入 ' + outDir + '\n');
       } else {
         const st = stateInit(pl);
         const text = JSON.stringify(st, null, 2);
         process.stdout.write(text);
-        if (outDir) writeFileSync(join(outDir, 'study-state.json'), text);
+        writeFileSync(join(outDir, 'study-state.json'), text);
+        process.stdout.write('\n[study] 已写入 ' + join(outDir, 'study-state.json') + '\n');
       }
     } else if (cmd === 'mark') {
       const st = JSON.parse(readFileSync(file, 'utf8'));

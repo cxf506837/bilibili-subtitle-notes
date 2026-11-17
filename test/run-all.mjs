@@ -30,6 +30,7 @@ const FILES = [
   'studypage.test.mjs', // 学习页：挑课程 / 进度 / 掌握度 / 笔记数 / 按词过滤概念
   'studylink.test.mjs', // 学习页链接：课程 id + 视角 → 扩展页 URL
   'studyplan.test.mjs',   // agent 侧：裁剪 / 救回 / 图 / 掌握度状态机
+  'agentbridge.test.mjs', // 小助手：盯下载目录 → 把 agent 窗口拉到前面
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

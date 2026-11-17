@@ -1057,3 +1057,49 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 - 两边用的是同一套分，但**取的集合不同**：右栏是整门课挑 6 个，中栏是当前这一批（可能叠了没看过 / 跨集 / 搜索）里按分数排。所以叠加筛选后，「看全部」的数量和中栏当前条数不一定相同。
 - 「看全部」会清空搜索框：这个动作的语义是「把这一批整个摊开」，留着搜索词会让人以为还有隐藏条件。
 - 掌握度仍是合成数据（同第三十九节），1 行 3 行的顺序是这份数据下的真机结果。
+
+## 四十一、「交给 agent」只差一步：文件名有前缀，新包落盘就把 agent 窗口拉过来（1.4.29）
+
+原来交接要用户做四件事：找到刚下载的文件 → 复制完整文件名 → 粘给 agent → 说清要它干什么。前三件都能省。
+
+### 做了什么
+
+| 位置 | 改动 | 为什么 |
+| --- | --- | --- |
+| 学习包文件名 | 固定前缀 `bn-study-`（`src/study.js`） | agent 只要认「前缀 + 下载目录里最新的那个」，不用猜课程名、也不用处理浏览器加的「 (1)」 |
+| 剪贴板里那句话 | 明确「找最新的 `bn-study-*.json`」「找不到就问我路径，别猜」（`src/packhandoff.js`，导出 `PREFIX` / `PATTERN`） | 同一句话既能当接口说明，也是给用户的抄写模板 |
+| agent 侧 `plan` | `--out` 指到不存在的多层目录不再 ENOENT，自动 mkdir；不给 `--out` 就落到 `study/<课程名>/`；没给目标时先说明「这次没裁剪」（`skills/bili-study/tools/study.mjs` 的 `safeDirName` / `outDirFor` / `ensureDir`） | 原来报 ENOENT 时依赖图和跳过清单其实已经算出来了，白算一遍 |
+| `tools/agent-bridge/` | 新的 Windows 小助手：盯下载目录，`bn-study-*.json` 一落盘就把 agent 窗口拉到前面 | 用户只剩 `Ctrl+V` → `Enter` |
+
+### 真机跑出来的（Windows，2026-11-17）
+
+| 项 | 实测 |
+| --- | --- |
+| `focus-dsh.ps1 -Test` | `process=DeepSeek Harness hwnd=329722 front=True` |
+| 直接 `SetForegroundWindow` | 返回 `False`、`front=False`（Windows 前台锁）——所以必须先敲一下 ALT（`keybd_event(0x12)`）解锁，再不行退 `WScript.Shell.AppActivate` |
+| 监听 → 落盘 | 造 `bn-study-测试.json` 到 `%USERPROFILE%\Downloads`，3 秒内日志出现「已拉到前面（新文件 bn-study-测试.json）· DeepSeek Harness」 |
+| 防抖 | 2 秒内连放两个包，只拉一次（`CooldownSec=8`）；隔 11 秒再放一个，正常再拉 |
+| 装 | `install.ps1` 写 `Startup\bn-agent-bridge.lnk`（TargetPath=powershell.exe、`-WindowStyle Hidden`、WindowStyle=7），并立刻起进程 |
+| 装完再触发 | 落一个包，日志「13:39:56 已拉到前面（新文件 bn-study-安装后触发.json）」 |
+| `install.ps1 -Uninstall` | 删 lnk + 按命令行停进程 |
+| skill 侧无目录 | `plan --out <不存在三层目录>` → 建目录并写出 `plan.md` 43180 B / `plan.json` 280268 B；不给 `--out` → `study\【从零开始的 AI 学习】\` |
+
+### 三个坑（都吃到了）
+
+1. **`Start-Process` 起的监听进程会跟着父 pwsh 一起没**。`install.ps1` 第一版用 `Start-Process -WindowStyle Hidden`，脚本退出后 `Get-CimInstance` 一个都查不到，日志也没有第二条「启动」。改成 `Invoke-CimMethod -ClassName Win32_Process -MethodName Create` 才活下来（本次 PID 36972）。
+2. **查进程会查到自己**。`Where-Object { $_.CommandLine -like "*bn-agent-bridge.ps1*" }` 会匹配到正在执行这条查询的 pwsh（查询语句本身就含这个字符串），于是「进程在跑」是假阳性。加 `-notlike "*-Command*"` 排除。
+3. **PowerShell 反引号不能出现在 JS 模板字符串里**。写 `-join "`n"` 直接把生成器的模板提前结束，报 `Unterminated template`；改用 `[Environment]::NewLine` / `[char]34` 拼引号。
+
+### 为什么不做「全自动发送」
+
+本机 DSH 的 web 接口要鉴权：`/api/health`、`/api/sessions` 不带 token 都是 401。要绕过去，要么从 CDP 里捞 boot token，要么做 UI 自动化——两者都会在用户没看着的时候替他按下回车，而 DSH 一升级就可能失效。
+停在「窗口到前面、文字在剪贴板」，把最后一步留给用户，既稳又不会误发。这条边界写进了 `tools/agent-bridge/README.md`。
+
+### 边界
+
+- 只认**下载目录 + 文件名前缀**，不看内容；下载目录可用 `-DownloadsDir` 改。
+- 拉窗口会抢焦点——这是它的用途，但用户正在打字时会打断。
+- 找不到窗口只写日志（agent 没开、进程名不叫 `DeepSeek` 都会这样，用 `-ProcessLike` 改匹配）。
+- 只在 Windows + PowerShell 5.1 上验过；macOS 没有对应实现。
+
+测试：`test/agentbridge.test.mjs` 28 条静态断言（BOM / CRLF / ALT 解锁 / WMI 启动 / 排除自检进程 / 不做 SendKeys）；`test/studyplan.test.mjs` 56 条含 `safeDirName` / `outDirFor` / `ensureDir` 11 条；`test/packhandoff.test.mjs` 41 条含前缀与「最新的」6 条。
