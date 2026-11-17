@@ -176,5 +176,43 @@ ok('没传 view 就是 all', P.parseView(null) === 'all' && P.parseView(undefine
 ok('乱写的 view 退回 all', P.parseView('CROSS') === 'all' && P.parseView('bogus') === 'all' && P.parseView('../../x') === 'all');
 ok('带空格也认', P.parseView(' cross ') === 'cross');
 
+
+// 「按概念」视角：一个概念一张卡，把整门课里每一处并起来（不能因为跨集就重复成两张卡）。
+const bcGroups = [
+  { ep: 1, label: 'S1-0', title: '引言', items: [
+    { name: 'agent', def: '能替你写代码的东西', status: 'shaky', cross: true, eps: [1, 2],
+      anchors: [
+        { ep: 1, t: 12, epLabel: 'S1-0', quote: '直接让 agent 写几十行' },
+        { ep: 1, t: 13, epLabel: 'S1-0', quote: '同一处不重复' },
+        { ep: 2, t: 40, epLabel: 'S2-0', quote: '让 agent 自己跑测试' },
+      ] },
+    { name: '单集词', cross: false, suspect: true, anchors: [{ ep: 1, t: 5, epLabel: 'S1-0', quote: '只在一集' }] },
+  ] },
+  { ep: 2, label: 'S2-0', title: '自动写代码', items: [
+    { name: 'Git', def: '版本管理', cross: false, anchors: [{ ep: 2, t: 90, epLabel: 'S2-0', quote: '用 git 存档' }] },
+    { name: '没有锚点', anchors: [] },
+  ] },
+];
+const bcAll = P.byConcept(bcGroups);
+ok('按概念：跨集的概念只出一张卡', bcAll.length === 3);
+ok('按概念：出现在集数多的排前面', bcAll[0].name === 'agent' && bcAll[0].eps === 2);
+ok('按概念：3 秒内的两处并成一处（2 集 2 处）', bcAll[0].count === 2);
+ok('按概念：定义与掌握度带出来', bcAll[0].def === '能替你写代码的东西' && bcAll[0].status === 'shaky');
+ok('按概念：没有锚点的概念不进列表', bcAll.every(function (x) { return x.name !== '没有锚点'; }));
+ok('按概念：suspect 标记带出来', bcAll.filter(function (x) { return x.name === '单集词'; })[0].suspect === true);
+const bcWatch = P.byConcept(bcGroups, { dropWatched: true, watchedEps: [1] });
+ok('只看没看过的：只被看过的集讲到的概念整条丢掉', bcWatch.length === 2);
+const bcAgent = bcWatch.filter(function (x) { return x.name === 'agent'; })[0];
+ok('只看没看过的：跨集概念只剩没看过那一集的出处', !!bcAgent && bcAgent.count === 1 && bcAgent.list[0].ep === 2);
+ok('dropWatched 默认关闭', P.byConcept(bcGroups, { watchedEps: [1] }).length === 3);
+const bcTie = P.byConcept([{ ep: 1, label: 'S1-0', items: [
+  { name: 'b', anchors: [{ ep: 1, t: 1 }, { ep: 1, t: 9 }] },
+  { name: 'a', anchors: [{ ep: 1, t: 1 }] },
+  { name: 'c', anchors: [{ ep: 1, t: 1 }] },
+] }]);
+ok('同集数时处数多的在前', bcTie[0].name === 'b' && bcTie[0].count === 2);
+ok('再同分按名字稳定排序', bcTie[1].name === 'a' && bcTie[2].name === 'c');
+ok('空输入不炸', P.byConcept(null).length === 0 && P.byConcept([]).length === 0);
+ok('不改动传进来的分组', bcGroups[0].items[0].anchors.length === 3);
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

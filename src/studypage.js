@@ -231,6 +231,36 @@
     return arr.slice();
   }
 
+  // 「按概念」视角（纯函数）：把一个概念在整门课里的每一处并到一张卡上，
+  // 按「出现在几集」降序排——跨集多的正是最该把它们连起来看的那些。
+  //   dropWatched —— 只看没看过的集里的出现处（看完的集讲了什么，这一屏先不占地方）
+  //   一处都不剩的概念整条丢掉，免得留下一张空卡
+  function byConcept(groups, opts) {
+    const o = opts || {};
+    const w = {};
+    (Array.isArray(o.watchedEps) ? o.watchedEps : []).forEach(function (e) { if (e != null) w[Number(e)] = 1; });
+    const drop = !!o.dropWatched;
+    const out = [];
+    (Array.isArray(groups) ? groups : []).forEach(function (g) {
+      ((g && g.items) || []).forEach(function (it) {
+        if (!it) return;
+        let list = occurrences(it);
+        if (drop) list = list.filter(function (a) { return !w[a.ep]; });
+        if (!list.length) return;
+        const eps = [];
+        list.forEach(function (a) { if (eps.indexOf(a.ep) < 0) eps.push(a.ep); });
+        out.push({
+          name: str(it.name), def: str(it.def), status: str(it.status),
+          cross: !!it.cross, suspect: !!it.suspect,
+          list: list, count: list.length, eps: eps.length,
+        });
+      });
+    });
+    out.sort(function (a, b) {
+      return (b.eps - a.eps) || (b.count - a.count) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+    return out;
+  }
   function tokens(q) {
     return str(q).toLowerCase().split(/\s+/).filter(Boolean);
   }
@@ -256,6 +286,6 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups, filterByView: filterByView, parseView: parseView, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
+    filterGroups: filterGroups, filterByView: filterByView, parseView: parseView, byConcept: byConcept, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });

@@ -18,6 +18,7 @@
   let q = '';
   let EPMAP = {};   // 集号 -> 课程里的那一集（bvid / cid / page / title）
   let view = 'all';   // 中栏视角：all | unwatched | cross
+  let mode = 'ep';    // 中栏排法：ep（按集）| concept（按概念，一个概念一张卡）
 
   function statusMap(all, id) {
     const raw = all['bnstudy:' + String(id)];
@@ -166,23 +167,78 @@
   }
 
   // 中栏顶上那行小字：现在看的是哪个视角、还剩多少个。
-  function renderNote(course, filtered, shown, totals) {
+  // cards 给了就说明现在按概念排（一个概念一张卡），统计口径跟着换。
+  function renderNote(course, filtered, shown, totals, cards) {
     const box = $('viewNote');
     if (!box) return;
-    if (view === 'all' && !q) { box.hidden = true; box.textContent = ''; return; }
-    const n = shown.reduce(function (a, g) { return a + ((g && g.items) || []).length; }, 0);
+    const byC = Array.isArray(cards);
+    if (view === 'all' && !q && !byC) { box.hidden = true; box.textContent = ''; return; }
+    const n = byC ? cards.length : shown.reduce(function (a, g) { return a + ((g && g.items) || []).length; }, 0);
     const parts = [];
     if (view === 'unwatched') {
       const all = ((course && course.episodes) || []).length;
-      parts.push('只看<b>没看过</b>的集：' + shown.length + ' / ' + all + ' 集');
+      if (byC) parts.push('只看<b>没看过</b>的集里讲到的：' + n + ' 个概念');
+      else parts.push('只看<b>没看过</b>的集：' + shown.length + ' / ' + all + ' 集');
     } else if (view === 'cross') {
       parts.push('只看<b>跨集</b>概念：' + n + ' 个（全课 ' + ((totals && totals.cross) || 0) + ' 个跨集）');
+    } else if (byC) {
+      parts.push('按<b>概念</b>看：' + n + ' 个，跨集 ' + ((totals && totals.cross) || 0) + ' 个');
     }
-    if (q) parts.push('搜索「' + q + '」命中 ' + n + ' 个概念' + (view !== 'all' ? '' : '，分布在 ' + shown.length + ' 集'));
+    if (q) parts.push('搜索「' + q + '」命中 ' + n + ' 个概念' + (view !== 'all' || byC ? '' : '，分布在 ' + shown.length + ' 集'));
     box.hidden = !parts.length;
     box.innerHTML = parts.join(' · ');
   }
 
+  // 「按概念」的一张卡：概念名、定义、懂没懂、出现在几集几处，下面直接列出每一处。
+  // 前 3 处铺开（扫一眼就知道讲了什么），多的收在按钮后面。
+  const CC_ROWS = 3;
+  function conceptCardEl(cd) {
+    const card = el('div', 'item cc');
+    card.appendChild(el('div', 'name', cd.name || ''));
+    if (cd.def) card.appendChild(el('div', 'def', cd.def));
+    const meta = el('div', 'meta');
+    if (cd.status === 'understood') meta.appendChild(el('span', 'badge under', '懂'));
+    else if (cd.status === 'shaky') meta.appendChild(el('span', 'badge shaky', '半懂'));
+    if (cd.eps > 1) meta.appendChild(el('span', 'badge cross', '跨 ' + cd.eps + ' 集'));
+    else if (cd.suspect) meta.appendChild(el('span', 'badge suspect', '只在一集出现'));
+    meta.appendChild(el('span', 'badge n', cd.count + ' 处'));
+    card.appendChild(meta);
+    const occBox = el('div', 'occ');
+    const draw = function (from, to) {
+      cd.list.slice(from, to).forEach(function (a) {
+        const row = el('div', 'occRow');
+        const lbl = el('span', 'lbl', a.label);
+        if (a.title) lbl.title = a.title;
+        row.appendChild(lbl);
+        const tk = el('a', 't', CV.fmtClock(a.t));
+        const thref = a.url ? CV.withT(a.url, a.t) : '';
+        tk.href = thref || '#';
+        tk.target = '_blank';
+        tk.rel = 'noopener';
+        tk.title = '在这一页看这一段';
+        tk.onclick = function (e) { if (playHere(a.ep, a.t, cd.name, thref)) e.preventDefault(); };
+        row.appendChild(tk);
+        row.appendChild(el('span', 'q', a.quote || ''));
+        occBox.appendChild(row);
+      });
+    };
+    draw(0, CC_ROWS);
+    card.appendChild(occBox);
+    if (cd.list.length > CC_ROWS) {
+      const more = el('button', 'occBtn', '还有 ' + (cd.list.length - CC_ROWS) + ' 处');
+      more.type = 'button';
+      more.setAttribute('aria-expanded', 'false');
+      more.onclick = function () {
+        const open = more.getAttribute('aria-expanded') !== 'true';
+        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+        occBox.innerHTML = '';
+        if (open) { draw(0, cd.list.length); more.textContent = '收起'; }
+        else { draw(0, CC_ROWS); more.textContent = '还有 ' + (cd.list.length - CC_ROWS) + ' 处'; }
+      };
+      card.appendChild(more);
+    }
+    return card;
+  }
   function renderGroups(course) {
     const box = $('groups');
     const empty = $('empty');
@@ -209,6 +265,22 @@
       mastery: statusMap(ALL, course && course.id),
     });
     const filtered = P.filterGroups(grouped.groups, q);
+    if (mode === 'concept') {
+      const base = (view === 'cross') ? P.filterByView(filtered, 'cross', []) : filtered;
+      const cards = P.byConcept(base, { dropWatched: view === 'unwatched', watchedEps: watchedIdx(course) });
+      renderNote(course, filtered, [], grouped.totals, cards);
+      if (!cards.length) {
+        empty.hidden = false;
+        if (q) empty.innerHTML = '<b>没有命中</b>换个词试试：概念名、定义里的词、原话里的句子都算。';
+        else if (view === 'unwatched') empty.innerHTML = '<b>没看过的集里还没有概念</b>点「全部」可以看讲过的那些。';
+        else if (view === 'cross') empty.innerHTML = '<b>还没有跨集概念</b>现在的概念都只在一集里出现；多抽几集，跨集连接就会出来。';
+        else empty.innerHTML = '<b>还没有概念</b>去视频页面板里点「概念」。';
+        return;
+      }
+      empty.hidden = true;
+      cards.forEach(function (cd) { box.appendChild(conceptCardEl(cd)); });
+      return;
+    }
     const shown = P.filterByView(filtered, view, watchedIdx(course));
     renderNote(course, filtered, shown, grouped.totals);
     if (!shown.length) {
@@ -417,6 +489,19 @@
     });
   });
 
+  // 中栏排法切换：按集 / 按概念。两个按钮只改 mode，重排一次中栏。
+  document.querySelectorAll('.mbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      mode = (b.getAttribute('data-mode') === 'concept') ? 'concept' : 'ep';
+      document.querySelectorAll('.mbtn').forEach(function (x) {
+        const on = x === b;
+        x.classList.toggle('on', on);
+        x.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      const course = P.pick(P.courses(ALL), courseId);
+      if (course) renderGroups(course);
+    });
+  });
   const pc = $('pclose');
   if (pc) pc.addEventListener('click', closePlayer);
   $('q').addEventListener('input', function (e) {

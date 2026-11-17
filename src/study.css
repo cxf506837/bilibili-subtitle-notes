@@ -48,6 +48,11 @@ h2:first-child { margin-top:0; }
 .fbtn.on { border-color:#bfe9fb; background:#f2fbfe; color:var(--accent); font-weight:600; }
 .vnote { font-size:12px; color:var(--sub); margin:0 0 8px; }
 .vnote b { color:var(--fg); }
+.modes { display:flex; gap:4px; margin:0 0 8px; }
+.mbtn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 10px; font:inherit; font-size:12px; color:#41464d; cursor:pointer; }
+.mbtn:hover { border-color:var(--accent); color:var(--accent); }
+.mbtn.on { border-color:#bfe9fb; background:#f2fbfe; color:var(--accent); font-weight:600; }
+.item .meta .badge.n { color:var(--sub); border-color:var(--line); background:#fff; }
 
 .ghead { display:flex; align-items:baseline; gap:8px; margin:18px 0 8px; }
 .ghead .lbl { font-weight:600; }

@@ -934,3 +934,43 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 - 没有概念缓存时不显示徽标（`hidden`），不会留一个「跨集 0」的空壳。
 - 徽标点击自己 `stopPropagation()`，不会顺手触发课程条的「打开课程」行为。
 - `view` 不认识就当作「全部」，学习页不会因为一个脏参数白屏。
+
+
+## 三十八、学习页中栏「按概念」视角（1.4.26）
+
+### 做了什么
+
+中栏原本只有一种排法：按集。跨集概念会在每一集重复出现一张卡——同一个「agent」在 5 集里就是 5 张，想比较「它在哪几集怎么说的」得自己上下翻。1.4.26 在中栏顶部加了「按集 / 按概念」两个按钮：**按概念**把一个概念的所有出现处合成一张卡，跨的集越多越靠前。
+
+- `src/studypage.js` 新增纯函数 `byConcept(groups, opts)`：展平各组 → 每个概念用 `occurrences()` 取全部出现处（同集 3 秒内合并成一处）→ `opts.dropWatched` 时剔除已看过集里的出现处、一处不剩就整条丢掉 → 排序 `集数降序 → 处数降序 → 名字升序`。导出给 UI 用。
+- `src/studypage-ui.js`：`conceptCardEl()` 画卡（名字 / 定义 / 「懂 · 半懂 · 跨 N 集 / 只在一集出现 · N 处」徽标 / 前 3 处引文 + 「还有 N 处」展开）；`renderGroups()` 在 `mode === 'concept'` 时走这条分支，并与既有的「全部 / 没看过 / 跨集」和搜索词叠加；`renderNote()` 多一个 `cards` 参数，文案换成概念口径（「按概念看：230 个，跨集 44 个」）。
+- `src/study.html` / `src/study.css`：`.modes` 两个按钮 + `.mbtn.on` 样式，沿用面板同一套 token。
+- `test/studypage.test.mjs` 加 13 条断言（跨集只出一张卡、集数多在前、3 秒内并成一处、无锚点丢弃、`dropWatched` 默认关闭及其行为、不改动入参……），62 → 92 全绿。
+
+### 真机（真 Edge 157，新 profile 从 `bili-notes-my` 1.4.26 加载，`season:8719249`）
+
+| # | 项 | 实测 |
+|---|---|---|
+| 1 | 默认（按集） | 中栏 `.item` 230 个，按钮状态「按集:true / 按概念:false」 |
+| 2 | 切「按概念」 | 230 张概念卡，提示「按概念看：230 个，跨集 44 个」；第一张是「agent」——跨 5 集 · 12 处 |
+| 3 | 展开「还有 9 处」 | 该卡引文 12 行、按钮变「收起」；屏幕内总行数 527 → 536 |
+| 4 | 点第一处 1:01 | 中栏顶部出现播放器，`bvid=BV1gruX6tEMK&cid=42722660096&t=61`，标题「agent · 1:01 · S1-3 有电脑才能学 AI 吗？」 |
+| 5 | 叠加「没看过」 | 78 个概念，提示「只看没看过的集里讲到的：78 个概念」 |
+| 6 | 叠加「跨集」 | 44 个概念（全课 44 个跨集），引文 131 行 |
+| 7 | 跨集 + 搜索 `agent` | 3 个概念，提示里同时写清两个条件，引文 9 行 |
+| 8 | 控制台异常 | 0 |
+
+截图：`_lab\tour\131-study-concept-mode.png`。
+
+### 这一遍卡住的真正原因（值得记住）
+
+现象是「扩展根本没加载」：`/json/list` 里看不到本扩展的 id，`chrome.storage` 是 undefined，学习页停在 about:blank。连试三次都一样，差点去怀疑 `--load-extension` 参数。实际是两个叠加的环境问题：
+
+1. **前几轮失败的测试浏览器没被真正杀掉，57 个 msedge 进程还活着**，其中一个仍占着 `--remote-debugging-port=9961`。新实例绑不上端口，我的 CDP 连的其实是那台**旧浏览器**——旧浏览器里扩展没加载，于是所有现象都指向「扩展不存在」。之前那次 `kill` 之所以静默无效，是因为在 PowerShell 5.1 里 `Get-Process` 没有 `CommandLine` 属性（比较结果是 $null，条件恒假，一个都没杀）。正确写法：`Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -match 'bn-v3-' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`。
+2. **`--load-extension` 配 `about:blank` 启动，扩展可能完全不加载**：先用 `https://www.bilibili.com/video/BV1TDGT6vEqC` 启动，扩展立刻出现在 `/json/list`（`service_worker | chrome-extension://ngkeme…/src/background.js`），之后再用 CDP 开学习页就正常。
+
+### 边界
+
+- 「全部 · 按概念」是 230 张卡的长列表，每张只铺前 3 处引文、其余折叠——不做虚拟滚动，但首屏渲染耗时与按集模式同一量级。
+- 按概念与「跨集 / 没看过」是叠加关系，不是互斥：先按视角裁剪，再按概念合并；`没看过` 时概念卡里的引文也只会剩未看过的集。
+- 没有概念缓存、或搜索零命中时走的是原有空态文案（这一版没有新增空态）。
