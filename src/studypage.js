@@ -261,6 +261,32 @@
     });
     return out;
   }
+  // 掌握度过滤：cards 是 byConcept 的产物（每张带 status）。
+  // 'weak' 只留还没弄懂的（半懂 / 没考过 / 没有状态），'unknown' 只留没考过的；不认识的口径原样返回拷贝。
+  function filterByMastery(cards, how) {
+    const list = Array.isArray(cards) ? cards : [];
+    if (how !== 'weak' && how !== 'unknown') return list.slice();
+    return list.filter(function (c) {
+      const s = str(c && c.status);
+      if (how === 'unknown') return !s || s === 'unknown';
+      return s !== 'understood';
+    });
+  }
+
+  // 这一批概念里懂 / 半懂 / 没考过各有几个，给按钮上的数字和「有没有导入掌握度」用。
+  function masteryStats(cards) {
+    const out = { total: 0, understood: 0, shaky: 0, unknown: 0, weak: 0 };
+    (Array.isArray(cards) ? cards : []).forEach(function (c) {
+      out.total++;
+      const s = str(c && c.status);
+      if (s === 'understood') out.understood++;
+      else if (s === 'shaky') out.shaky++;
+      else out.unknown++;
+      if (s !== 'understood') out.weak++;
+    });
+    return out;
+  }
+
   function tokens(q) {
     return str(q).toLowerCase().split(/\s+/).filter(Boolean);
   }
@@ -286,6 +312,7 @@
   return {
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
-    filterGroups: filterGroups, filterByView: filterByView, parseView: parseView, byConcept: byConcept, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
+    filterGroups: filterGroups, filterByView: filterByView, parseView: parseView, byConcept: byConcept,
+    filterByMastery: filterByMastery, masteryStats: masteryStats, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });

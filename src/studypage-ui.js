@@ -19,6 +19,7 @@
   let EPMAP = {};   // 集号 -> 课程里的那一集（bvid / cid / page / title）
   let view = 'all';   // 中栏视角：all | unwatched | cross
   let mode = 'ep';    // 中栏排法：ep（按集）| concept（按概念，一个概念一张卡）
+let weakOnly = false;   // 按概念时，只留「还没弄懂」的（半懂 / 没考过）
 
   function statusMap(all, id) {
     const raw = all['bnstudy:' + String(id)];
@@ -168,7 +169,7 @@
 
   // 中栏顶上那行小字：现在看的是哪个视角、还剩多少个。
   // cards 给了就说明现在按概念排（一个概念一张卡），统计口径跟着换。
-  function renderNote(course, filtered, shown, totals, cards) {
+  function renderNote(course, filtered, shown, totals, cards, extra) {
     const box = $('viewNote');
     if (!box) return;
     const byC = Array.isArray(cards);
@@ -185,6 +186,9 @@
       parts.push('按<b>概念</b>看：' + n + ' 个，跨集 ' + ((totals && totals.cross) || 0) + ' 个');
     }
     if (q) parts.push('搜索「' + q + '」命中 ' + n + ' 个概念' + (view !== 'all' || byC ? '' : '，分布在 ' + shown.length + ' 集'));
+    if (weakOnly && extra && extra.stats) {
+      parts.push('只看<b>还没弄懂</b>的：' + extra.stats.weak + ' / ' + extra.stats.total + ' 个');
+    }
     box.hidden = !parts.length;
     box.innerHTML = parts.join(' · ');
   }
@@ -239,6 +243,19 @@
     }
     return card;
   }
+  // 「还没弄懂」按钮：只在按概念、且真的导入过掌握度时才出现，数字是这一批里半懂 + 没考过的个数。
+  function syncWeakBtn(stats) {
+    const b = $('mWeak');
+    if (!b) return;
+    const hasMastery = !!stats && (stats.understood + stats.shaky) > 0;
+    const show = mode === 'concept' && hasMastery && stats.weak > 0;
+    b.hidden = !show;
+    b.textContent = '还没弄懂 ' + (stats ? stats.weak : 0);
+    const on = show && weakOnly;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
   function renderGroups(course) {
     const box = $('groups');
     const empty = $('empty');
@@ -267,11 +284,15 @@
     const filtered = P.filterGroups(grouped.groups, q);
     if (mode === 'concept') {
       const base = (view === 'cross') ? P.filterByView(filtered, 'cross', []) : filtered;
-      const cards = P.byConcept(base, { dropWatched: view === 'unwatched', watchedEps: watchedIdx(course) });
-      renderNote(course, filtered, [], grouped.totals, cards);
+      const allCards = P.byConcept(base, { dropWatched: view === 'unwatched', watchedEps: watchedIdx(course) });
+      const stats = P.masteryStats(allCards);
+      const cards = weakOnly ? P.filterByMastery(allCards, 'weak') : allCards;
+      syncWeakBtn(stats);
+      renderNote(course, filtered, [], grouped.totals, cards, { stats: stats, weakOnly: weakOnly });
       if (!cards.length) {
         empty.hidden = false;
         if (q) empty.innerHTML = '<b>没有命中</b>换个词试试：概念名、定义里的词、原话里的句子都算。';
+        else if (weakOnly) empty.innerHTML = '<b>都弄懂了</b>这个视角里已经没有「半懂 / 没考过」的概念——等下一次拷打、再导一次掌握度，它还会变。';
         else if (view === 'unwatched') empty.innerHTML = '<b>没看过的集里还没有概念</b>点「全部」可以看讲过的那些。';
         else if (view === 'cross') empty.innerHTML = '<b>还没有跨集概念</b>现在的概念都只在一集里出现；多抽几集，跨集连接就会出来。';
         else empty.innerHTML = '<b>还没有概念</b>去视频页面板里点「概念」。';
@@ -281,6 +302,7 @@
       cards.forEach(function (cd) { box.appendChild(conceptCardEl(cd)); });
       return;
     }
+    syncWeakBtn(null);   // 按集排时没有这个按钮，别把它留在屏幕上
     const shown = P.filterByView(filtered, view, watchedIdx(course));
     renderNote(course, filtered, shown, grouped.totals);
     if (!shown.length) {
@@ -490,10 +512,11 @@
   });
 
   // 中栏排法切换：按集 / 按概念。两个按钮只改 mode，重排一次中栏。
-  document.querySelectorAll('.mbtn').forEach(function (b) {
+  // 只给「按集 / 按概念」两个按钮接线：#mWeak 也带 .mbtn（样式相同），但它不是排法。
+  document.querySelectorAll('.mbtn[data-mode]').forEach(function (b) {
     b.addEventListener('click', function () {
       mode = (b.getAttribute('data-mode') === 'concept') ? 'concept' : 'ep';
-      document.querySelectorAll('.mbtn').forEach(function (x) {
+      document.querySelectorAll('.mbtn[data-mode]').forEach(function (x) {
         const on = x === b;
         x.classList.toggle('on', on);
         x.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -501,6 +524,13 @@
       const course = P.pick(P.courses(ALL), courseId);
       if (course) renderGroups(course);
     });
+  });
+  // 「还没弄懂」开关：只改这一个布尔，重排中栏；按集时它自己会藏起来。
+  const mw = $('mWeak');
+  if (mw) mw.addEventListener('click', function () {
+    weakOnly = !weakOnly;
+    const course = P.pick(P.courses(ALL), courseId);
+    if (course) renderGroups(course);
   });
   const pc = $('pclose');
   if (pc) pc.addEventListener('click', closePlayer);

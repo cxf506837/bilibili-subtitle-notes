@@ -214,5 +214,28 @@ ok('同集数时处数多的在前', bcTie[0].name === 'b' && bcTie[0].count ===
 ok('再同分按名字稳定排序', bcTie[1].name === 'a' && bcTie[2].name === 'c');
 ok('空输入不炸', P.byConcept(null).length === 0 && P.byConcept([]).length === 0);
 ok('不改动传进来的分组', bcGroups[0].items[0].anchors.length === 3);
+// ---- filterByMastery / masteryStats（1.4.27） ----
+{
+  const cards = [
+    { name: 'a', status: 'understood' },
+    { name: 'b', status: 'shaky' },
+    { name: 'c', status: 'unknown' },
+    { name: 'd', status: '' },
+    { name: 'e' },
+  ];
+  const weak = P.filterByMastery(cards, 'weak');
+  ok('filterByMastery weak 只留没弄懂的', weak.map(function (x) { return x.name; }).join(',') === 'b,c,d,e');
+  const unk = P.filterByMastery(cards, 'unknown');
+  ok('filterByMastery unknown 只留没考过的', unk.map(function (x) { return x.name; }).join(',') === 'c,d,e');
+  const all = P.filterByMastery(cards, 'all');
+  ok('filterByMastery 不认识的口径原样返回', all.length === 5);
+  ok('filterByMastery 返回新数组', all !== cards);
+  ok('filterByMastery 空输入', P.filterByMastery(null, 'weak').length === 0);
+  const st = P.masteryStats(cards);
+  ok('masteryStats 计数', st.total === 5 && st.understood === 1 && st.shaky === 1 && st.unknown === 3 && st.weak === 4);
+  const st2 = P.masteryStats(null);
+  ok('masteryStats 空输入', st2.total === 0 && st2.weak === 0);
+  ok('masteryStats 全懂时 weak 为 0', P.masteryStats([{ status: 'understood' }]).weak === 0);
+}
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

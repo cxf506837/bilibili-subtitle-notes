@@ -52,6 +52,8 @@ h2:first-child { margin-top:0; }
 .mbtn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 10px; font:inherit; font-size:12px; color:#41464d; cursor:pointer; }
 .mbtn:hover { border-color:var(--accent); color:var(--accent); }
 .mbtn.on { border-color:#bfe9fb; background:#f2fbfe; color:var(--accent); font-weight:600; }
+.mbtn.weak { margin-left:auto; }
+.mbtn.weak.on { border-color:#ffd8a8; background:#fff8ee; color:#b25e00; }
 .item .meta .badge.n { color:var(--sub); border-color:var(--line); background:#fff; }
 
 .ghead { display:flex; align-items:baseline; gap:8px; margin:18px 0 8px; }
