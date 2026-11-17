@@ -32,6 +32,7 @@ const FILES = [
   'studyplan.test.mjs',   // agent 侧：裁剪 / 救回 / 图 / 掌握度状态机
   'cpack.test.mjs', // 「交给 agent」没勾集数时也必须给反应
   'exporthint.test.mjs', // 合集页点「导出」时提醒一次「交给 agent」在哪
+  'packcard.test.mjs', // 导出学习包后的结果卡片：文件名 + 复制 + 存 Markdown
   'agentbridge.test.mjs', // 小助手：盯下载目录 → 把 agent 窗口拉到前面
   'realdata.test.mjs',    // 60 条真实样本回归
 ];

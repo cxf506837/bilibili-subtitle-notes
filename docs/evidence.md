@@ -1192,3 +1192,71 @@ status after 0-pick click: （没变）
 - 按钮仍然不会在没勾集数时自己替你勾；它只负责把「该勾哪个方框」说清楚。
 - 真正跑起来后仍然是长任务（每集取样 2~4 次 + 抽概念），中途点它会变成「正在停止…」（`state.batch.cancel`），不是这次的改动。
 - 课程条是否容易发现（`▾` 只有 11px）是另一个问题，还没改。
+
+## 四十四、导出学习包之后，面板上多一张「看得见的结果卡」（1.4.32）
+
+### 事情的起点：用户说「点了交给 agent 还是没反应」
+
+1.4.31 修掉了「没勾集数时按钮是 disabled 死键」，但用户再说一次「没有任何反应」。这次先去找文件，而不是再猜代码：
+
+`C:\Users\Admin\Downloads\bn-study-【从零开始的 AI 学习】（S2 · 1 集学习包）.json`，2565 B，15:04:25 落盘。解析出来是完整的 `bn-study-pack/1`：
+
+| 字段 | 值 |
+| --- | --- |
+| `course.id` | `season:8719249` |
+| `scope` | `"S2"` |
+| `counts` | `{episodes:1, notes:8, concepts:0, anchors:0}` |
+| `episodes[0]` | `index:20 / label:"S2-5" / bvid:BV1kJJr6uEzy / cid:42750838123 / duration:311 / verdict:"single" / votes:1 / notes_n:8 / concepts:[]` |
+
+⇒ **导出其实是成功的**。`concepts:0` 也不是失败：学习包里只存 `notes_n / notes / concepts`（`src/study.js`），没有 `sentences`；本机没填 API Key 就不会有概念卡。
+
+所以「没反应」的真相是：**文件悄悄落进了下载目录，界面上只有状态条那一行字变了**，而浏览器的下载提示又很容易被忽略。这是「缺少可见的完成反馈」，不是死键。
+
+### 做了什么
+
+| 位置 | 改动 | 为什么 |
+| --- | --- | --- |
+| `src/content.js` | 面板顶部新增结果卡片 `#packOut`：标题「学习包已导出」+ 概要（几集/几条笔记/概念数）+ 文件名 + 提示 + 两个按钮 | 导出这种「东西在别处（下载目录）落下了」的操作，必须在原地留下看得见的收据 |
+| 同上 | 「复制「交给 agent」的话」按钮（`#packOutCopy`） | 剪贴板可能没写成（无焦点页面会被拒），给用户一个手动的入口 |
+| 同上 | 「存 Markdown」按钮（`#packOutMd`） | 见下：自动下第二份会被浏览器拦掉 |
+| `manifest.json` | 1.4.31 → 1.4.32 | |
+| `test/packcard.test.mjs` | 新增 10 条：卡片/文件名/两个按钮都在、成功后必须调 `showPackOut`、卡片给的是 `.json`、没有自动下 `.md` 的 `setTimeout`、`packMd` 存了内容、按钮真去调 `downloadMarkdown`、没勾集数仍是可操作提示 | 这张卡的意义是「用户能看见」，只能靠源码断言 + 真机截图两头拦 |
+
+### 顺手挖出来的第二个真 bug：第二份下载会被静默拦掉
+
+原来 `makeStudyPack()` 里是：
+
+```js
+downloadMarkdown(pack.json, pack.baseName + '.json');
+setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 600);
+```
+
+第一次下载发生在用户点击的手势里，第二次发生在 `setTimeout` 里 —— **没有用户手势，Chrome/Edge 会静默拦掉自动下载**（新 profile 里连提示都没有）。真机验证时下载目录里只出现 `.json`，`.md` 一次都没落地。
+
+不打算为此加 `downloads` 权限（会触发商店重新授权），改法：不再自动下 `.md`，改成卡片上的按钮，点了（有手势）才下。
+
+### 真机跑出来的（新 profile + `--load-extension=bili-notes`，BV1BgH36DE7y 合集 25 集）
+
+为了让「登录 + 有 AI 字幕」这两件事不成为变量，网络边界上只替换了 `window.BnGate.gateSubtitle`（返回一份固定的 `stable` 字幕），其余全部真跑：真课程目录、真勾选、真学习包构建、真落盘。
+
+| 步骤 | 实测 |
+| --- | --- |
+| 展开课程条 + 勾 1 集 | `picks:25`、`cpack` 可见（`display:flex`、`rect:[1217,1054,112,18]`）、文案「交给 agent（1 集）」 |
+| 用**真鼠标事件**点它（`Input.dispatchMouseEvent`） | +800ms 起状态条「学习包已导出 · 1 集 · 0 条笔记 · 没抽概念」 |
+| 结果卡片 | `hidden=false`／`meta=1 集 · 0 条笔记 · 没抽概念`／`name=文件：bn-study-【从零开始的 AI 学习】（S1 · 1 集学习包）.json（在下载目录）` |
+| 卡片提示 | 「「交给 agent」的话已经放进剪贴板；想自己看就点「存 Markdown」」⇒ 有手势时剪贴板写成功 |
+| 下载目录 | 只多出 `…（S1 · 1 集学习包）.json`（**没有 .md**，与上面的 bug 吻合） |
+| 点「存 Markdown」（真鼠标） | 新文件 `bn-study-【从零开始的 AI 学习】（S1 · 1 集学习包）.md` 落盘，状态条「已存 …md」 |
+| 控制台 | 0 条异常 |
+| 截图 | `_lab/tour/137-pack-card.png`（结果卡 + 「复制交给 agent 的话」/「存 Markdown」两个按钮） |
+
+### 这次踩到的两个验证陷阱（跟产品无关，但会骗人）
+
+1. **面板会自动收起**：鼠标移开 600ms 就缩成 22px 细条，里面的按钮 `getBoundingClientRect()` 全是 0。用 CDP 分步点按钮时，中途读文件/打日志超过 600ms，下一次就点到「0×0 的按钮」上，看起来像「按钮没接线」。先把鼠标 dispatch 到面板里，再取 rect。
+2. **合成点击不是用户手势**：`element.click()` 能触发逻辑，但下载/剪贴板这类需要用户手势的 API 会被拦。要验真实路径就得用 `Input.dispatchMouseEvent`（mousePressed + mouseReleased）。
+
+### 边界
+
+- 这张卡只在本次导出成功后出现；收起后再刷新页面就没了（不做历史列表）。
+- 「存 Markdown」用的是内存里的 `packMd`，刷新页面后点它会提示「这份 Markdown 已经没了」。
+- 卡片不会替用户判断「到底该点哪个」——工具栏的「导出」（单集）与课程清单的「交给 agent（N 集）」仍是两个入口，1.4.30 的提醒继续负责把用户指过去。

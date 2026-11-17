@@ -66,6 +66,14 @@
     '.bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px; font-size: 12px; }',
     '.acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 0 10px 8px; border-bottom: 1px solid var(--bnline); }',
     '.acts { position: relative; }',
+'.packout { margin: 6px 10px 0; padding: 8px 9px; border: 1px solid #b7e6c4; border-radius: 6px; background: #f3fcf6; font-size: 12px; line-height: 1.55; }',
+'.packout .po1 { display: flex; align-items: center; gap: 6px; }',
+'.packout .pot { font-weight: 600; color: #1f8b45; }',
+'.packout .pom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bnmuted); }',
+'.packout .pox { flex: 0 0 auto; padding: 0 6px; line-height: 18px; min-width: 0; }',
+'.packout .po2 { margin-top: 3px; color: #14161a; word-break: break-all; font-size: 11px; }',
+'.packout .po3 { display: flex; align-items: center; gap: 8px; margin-top: 6px; }',
+'.packout .poh { flex: 1; min-width: 0; color: var(--bnmuted); font-size: 11px; }',
 '.autobar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 10px 8px; padding: 7px 9px; font-size: 12px; line-height: 1.5; border: 1px solid var(--bnline); border-radius: 6px; background: var(--bnfill); }',
 '.autobar .at { flex: 1 1 100%; color: var(--bnmuted); }',
 '.autobar.hidden { display: none; }',
@@ -291,6 +299,12 @@
     '<span class="grow" id="statusText">初始化…</span>',
     '<span class="mono" id="cost"></span>',
     '</div>',
+    '<div class="packout hidden" id="packOut">',
+    '<div class="po1"><span class="pot">学习包已导出</span><span class="pom" id="packOutMeta"></span><button class="btn sm pox" id="packOutHide" title="收起这条">✕</button></div>',
+    '<div class="po2 mono" id="packOutName"></div>',
+    '<div class="poh" id="packOutHint"></div>',
+    '<div class="po3"><button class="btn sm accent" id="packOutCopy">复制「交给 agent 的话」</button><button class="btn sm" id="packOutMd" title="把这份学习包的 Markdown 存到下载目录（带时间戳、可直接看）">存 Markdown</button></div>',
+    '</div>',
     '<div class="autobar hidden" id="autoBar">',
     '<span class="at">边看边整理：每看一段就自动花一次模型调用（约 ¥0.002/段，1 小时视频约 ¥0.2）。不点就不花。</span>',
     '<button class="btn sm accent" id="autoYes">边看边整理</button>',
@@ -368,6 +382,13 @@
   const stream = $('stream');
   const outline = $('outline');
   const statusText = $('statusText');
+    const packOutEl = $('packOut');
+    const packOutMetaEl = $('packOutMeta');
+    const packOutNameEl = $('packOutName');
+    const packOutHintEl = $('packOutHint');
+    const packOutCopyEl = $('packOutCopy');
+const packOutMdEl = $('packOutMd');
+    const packOutHideEl = $('packOutHide');
   const dot = $('dot');
   const costEl = $('cost');
 
@@ -791,6 +812,49 @@
   }
 
   // 学习包：课程结构 + 笔记 + 概念卡，导出 JSON（机器读）与 Markdown（人读）。
+  // 学习包导出后，光靠状态条那句「学习包已导出 · 1 集 …」太容易被错过（用户会以为没反应，
+  // 而文件其实已经躺在下载目录里了）。这条卡片放在面板最上面，带文件名和「复制那句话」按钮。
+  let packHandText = '';
+let packMd = null;
+  function showPackOut(res) {
+    packHandText = res.text || '';
+    if (packOutMetaEl) packOutMetaEl.textContent = res.meta || '';
+    if (packOutNameEl) packOutNameEl.textContent = res.name ? '文件：' + res.name + '（在下载目录）' : '';
+    if (packOutHintEl) packOutHintEl.textContent = res.hint || '';
+    if (packOutEl) packOutEl.classList.remove('hidden');
+  }
+  function hidePackOut() { if (packOutEl) packOutEl.classList.add('hidden'); }
+
+  if (packOutHideEl) packOutHideEl.addEventListener('click', hidePackOut);
+  if (packOutCopyEl) packOutCopyEl.addEventListener('click', async function () {
+    const txt = packHandText || (function () {
+      const HO = window.BnPackHandoff;
+      if (!HO) return '';
+      let t = '';
+      try { chrome.storage.local.get([HO.KEY], function (o) { t = (o && o[HO.KEY] && o[HO.KEY].text) || ''; }); } catch (e) {}
+      return t;
+    })();
+    if (!txt) { setStatus('warn', '没有可复制的话', '重新点一次「交给 agent」，或点扩展图标复制'); return; }
+    let ok = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        ok = await Promise.race([
+          navigator.clipboard.writeText(txt).then(function () { return true; }, function () { return false; }),
+          new Promise(function (res) { setTimeout(function () { res(false); }, 1500); }),
+        ]);
+      }
+    } catch (e) { ok = false; }
+    if (ok) setStatus('ok', '已复制「交给 agent 的话」', '去 agent 里粘一下：文件在下载目录，bn-study- 开头');
+    else setStatus('warn', '剪贴板没写进去', '页面没有焦点时浏览器会拒绝；点一下页面再点这个按钮');
+  });
+
+  // zip 包里的 .md 是给人看的；浏览器只肯在用户手势里下第二份文件，所以给它一个按钮。
+  if (packOutMdEl) packOutMdEl.addEventListener('click', function () {
+    if (!packMd) { setStatus('warn', '这份 Markdown 已经没了', '刷新页面后重新点一次「交给 agent」'); return; }
+    downloadMarkdown(packMd.text, packMd.name);
+    setStatus('ok', '已存 ' + packMd.name, '在下载目录；.json 给 agent，.md 自己看');
+  });
+
   async function makeStudyPack() {
     const m = courseModel;
     if (!m) return;
@@ -859,7 +923,8 @@
         failed: bad,
       });
       downloadMarkdown(pack.json, pack.baseName + '.json');
-      setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 600);
+      // 第二份下载（.md）没有用户手势，Chrome/Edge 会静默拦掉 —— 改成卡片上的按钮，点了才下。
+      packMd = { text: pack.md, name: pack.baseName + '.md' };
       const n = pack.doc.counts;
       const conceptMsg = n.concepts ? (n.concepts + ' 个概念 / ' + n.anchors + ' 个时间锚点') : '没抽概念';
       // 交给 agent 的最后一厘米：浏览器只肯把文件下到下载目录，扩展也拿不到绝对路径。
@@ -876,6 +941,7 @@
           episodes: good.length,
           goal: goalNow,
         });
+        packHandText = handText;
         const rec = HO.record({
           baseName: pack.baseName, course: (m.title || ''), scope: scope,
           episodes: good.length, goal: goalNow, text: handText,
@@ -904,6 +970,12 @@
       setStatus(bad.length ? 'warn' : 'ok',
         '学习包已导出 · ' + n.episodes + ' 集 · ' + n.notes + ' 条笔记 · ' + conceptMsg,
         bad.length ? '没导出的集写在包末尾' : packTip);
+      showPackOut({
+        name: pack.baseName + '.json',
+        meta: n.episodes + ' 集 · ' + n.notes + ' 条笔记 · ' + conceptMsg,
+        hint: (packCopied ? '「交给 agent」的话已经放进剪贴板' : '点左边按钮，把「交给 agent」的话复制到剪贴板') + '；想自己看就点「存 Markdown」',
+        text: packHandText,
+      });
     } finally {
       state.batch.running = false;
     }
