@@ -48,5 +48,28 @@ const readme = read("README.md");
 ok("README：写清用户只按 Ctrl+V → Enter", readme.indexOf("Ctrl+V") > 0);
 ok("README：说明为什么不做自动发送", readme.indexOf("401") > 0);
 
+
+// node 不在 PATH 是常态（DSH 自带运行时、nvm/volta/scoop、绿色版 node 都不在 PATH）。
+// 装收件端时找不到 node 的经验：install.ps1 只看 Get-Command node 就把用户拦在门外，
+// 所以抽了 resolve-node.ps1，并允许 -NodePath 显式指定。
+const resolve = read("resolve-node.ps1");
+ok("resolve-node.ps1 带 UTF-8 BOM", resolve.charCodeAt(0) === 0xfeff);
+ok("resolve-node.ps1 用 CRLF", resolve.indexOf("\r\n") > 0);
+ok("resolve：导出 Resolve-NodeExe", resolve.indexOf("function Resolve-NodeExe") > 0);
+ok("resolve：先走 PATH", resolve.indexOf("Get-Command node") > 0);
+ok("resolve：常见安装位置（Program Files / Volta / scoop）", resolve.indexOf("Volta") > 0 && resolve.indexOf("scoop") > 0);
+ok("resolve：会找 DSH 自带运行时", resolve.indexOf(".dsh") > 0 && resolve.indexOf("dsh-runtimes") > 0);
+ok("resolve：找不到时列出找过的位置", resolve.indexOf("找过：") > 0);
+ok("resolve：显式路径不存在就报错", resolve.indexOf("指定的 node 不存在") > 0);
+
+const start = read("start-hook.ps1");
+ok("start-hook：支持 -NodePath", start.indexOf("[string]$NodePath") > 0);
+ok("start-hook：用共享解析器", start.indexOf("resolve-node.ps1") > 0 && start.indexOf("Resolve-NodeExe") > 0);
+
+ok("install：支持 -NodePath", install.indexOf("[string]$NodePath") > 0);
+ok("install：用共享解析器", install.indexOf("resolve-node.ps1") > 0 && install.indexOf("Resolve-NodeExe") > 0);
+ok("install：把 node 绝对路径钉进快捷方式", install.indexOf('-NodePath " + $Q + $nodeExe') > 0);
+ok("install：起进程时也带上 node 绝对路径", install.indexOf('" -NodePath " + $Q + $nodeExe') > 0);
+
 console.log("agentbridge: " + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

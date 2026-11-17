@@ -116,5 +116,11 @@ if (up) {
 child.kill();
 try { rmSync(inbox, { recursive: true, force: true }); } catch (e) {}
 
+// 自动发现：从收件端地址推出 /bn-ping。推导错了只表现成「连不上」，所以单独测。
+ok('pingUrl：带路径的地址只留 origin', H.pingUrl('http://127.0.0.1:8791/bn-pack') === 'http://127.0.0.1:8791/bn-ping');
+ok('pingUrl：只有 origin 也行', H.pingUrl('http://127.0.0.1:8791') === 'http://127.0.0.1:8791/bn-ping');
+ok('pingUrl：多级路径切在第一个斜杠', H.pingUrl('http://localhost:9000/a/b') === 'http://localhost:9000/bn-ping');
+ok('pingUrl：非回环推导出空串', H.pingUrl('https://example.com/x') === '' && H.pingUrl('http://evil.com/x') === '');
+ok('pingUrl：空值不炸', H.pingUrl('') === '' && H.pingUrl(null) === '');
 console.log('agenthook: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

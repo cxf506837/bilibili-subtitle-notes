@@ -199,6 +199,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })().then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e).slice(0, 200) }));
     return true;
   }
+  if (msg && msg.type === 'bnHookPing') {
+    // 自动发现：用户没设置过开关时，内容脚本先问一句「本机收件端在不在」。
+    // 只在后台问得到的答复才可信——内容脚本的 fetch 受页面 CORS 约束，探不出活着的收件端。
+    (async () => {
+      const H = (typeof BnAgentHook !== 'undefined') ? BnAgentHook : null;
+      const url = H ? H.pingUrl(msg.url) : '';
+      if (!url) return { ok: false, reason: 'no-endpoint' };
+      try {
+        const r = await fetchWithTimeout(url, { method: 'GET' }, 1500);
+        const j = await r.json().catch(() => null);
+        const alive = !!(j && j.ok && j.spec === H.SPEC);
+        return alive ? { ok: true, spec: j.spec, inbox: String(j.inbox || '') } : { ok: false, reason: 'bad-response' };
+      } catch (e) {
+        return { ok: false, reason: 'network' };
+      }
+    })().then(sendResponse).catch((e) => sendResponse({ ok: false, reason: 'network', error: String(e && e.message || e).slice(0, 160) }));
+    return true;
+  }
   if (msg && msg.type === 'bnHook') {
     // 把学习包 POST 到用户自己跑的本地 agent 收件端。
     // 走后台而不是内容脚本：内容脚本的 fetch 受页面 CORS 约束，后台带着 host_permissions 不受。

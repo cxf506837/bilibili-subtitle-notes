@@ -77,11 +77,20 @@
     return '没送到本地 agent' + (why ? '：' + why : '');
   }
 
+  // 从收件端地址推出 /bn-ping：自动发现只在用户还没设置过开关时用一次。
+  function pingUrl(endpoint) {
+    var u = cleanEndpoint(endpoint);
+    if (!u) return '';
+    var i = u.indexOf('/', u.indexOf('//') + 2);
+    return (i < 0 ? u : u.slice(0, i)) + '/bn-ping';
+  }
+
   return {
     SPEC: SPEC,
     DEFAULT_ENDPOINT: DEFAULT_ENDPOINT,
     isLocalEndpoint: isLocalEndpoint,
     cleanEndpoint: cleanEndpoint,
+    pingUrl: pingUrl,
     buildPayload: buildPayload,
     resultLine: resultLine,
   };

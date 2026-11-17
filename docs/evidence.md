@@ -1309,3 +1309,68 @@ setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 60
 - 默认关闭，开关在设置页；关着的时候导出行为和 1.4.32 完全一样（不试连接、不报错）。
 - 投递是「尽力而为」：3 秒超时、不重试、失败只写在卡片那一行，不影响导出本身。
 - 收件端不校验包体结构，只看 `spec` 和 `pack.course`——它是投递箱，不是校验器；包的格式由 `src/study.js` 和 `docs/agent-integration.md` 定义。
+
+## 四十六、装在自己机器上：收件端 + 「没设置过也能自动送」（1.4.34）
+
+上一节的 1.4.33 有个「最后一公里」：装好收件端之后，用户还得去设置页勾一下「本地 agent」。用户的要求是「你来装」，装到一半卡在「你去勾个框」不算装完。
+
+### 装的时候先被自己的脚本挡住
+
+`install.ps1 -Hook` 第一句就失败：
+
+```
+找不到 node.exe。装 Node.js 18+ 后重试。
+```
+
+本机的 node 只有 DSH 自带那份（`%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe`），不在 PATH 里。这不是个案：绿色版 node、nvm 的非活动版本、只给某个工具用的运行时都不在 PATH。
+
+| 改动 | 为什么 |
+| --- | --- |
+| 新增 `tools/agent-bridge/resolve-node.ps1`（`Resolve-NodeExe`） | 显式 `-NodePath` → PATH → Program Files / Volta / scoop → **DSH 自带运行时**（`~\.dsh\dsh-runtimes\*\dependencies\node\bin\node.exe`，取最新一个） |
+| `start-hook.ps1` / `install.ps1` 加 `-NodePath`，都改用这个解析器 | 一个地方找 node，两处用；报错时把找过的位置一起打出来 |
+| `install.ps1` 把解析到的 node 绝对路径钉进快捷方式的参数 | 登录时用「启动」文件夹那条是全新的环境，PATH 可能又不一样；钉死才不会再走一次解析 |
+
+踩到的两个 PowerShell 细节：
+
+- `Join-Path $env:ProgramFiles ...` 在 `$env:ProgramFiles` 为空时抛的是 **「无法将参数绑定到参数 Path，因为该参数是空值」**，跟「找不到 node」没有半点关系，很容易误判成脚本语法错。改成先 `Where-Object { $_ }` 过滤空基路径。
+- 我这边跑脚本时进程环境是空的（`process.env` 不带 Windows 的 USERPROFILE/ProgramFiles），所以「在我这里找不到 node」有一部分是测试环境造成的；但 `SystemDrive` 那条候选确实是多余依赖，删了。
+
+### 装好了什么
+
+| 项 | 值 |
+| --- | --- |
+| 开机启动 | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\bn-agent-hook.lnk`（`-WindowStyle Hidden`，参数里带 `-Port 8791 -NodePath "<绝对路径>"`） |
+| 监听 | `http://127.0.0.1:8791/bn-pack`，只绑回环 |
+| 目录 | `%LOCALAPPDATA%\bn-agent-bridge\inbox\` + `latest.json` + `bridge.log` |
+| 自测 | `GET /bn-ping` → `{ok:true, spec:"bn-agent-hook/1", inbox:"…\\inbox", pid:…}` |
+
+### 「没设置过也能自动送」：1.4.34
+
+设置页那个勾选框对「刚刚装好收件端」的人是纯摩擦。改成：**用户从没设置过开关时，导出后先问一句「本机收件端在不在」**——在就自动投递并在卡片上写「（自动发现，已记住）」，同时把 `bn.hookOn/bn.hookUrl` 落盘（设置页从此显示为已开）；不在就完全静默，不弹提示、不报错。
+
+| 位置 | 改动 |
+| --- | --- |
+| `src/agenthook.js` | 新增 `pingUrl(endpoint)`：从收件端地址推出 `/bn-ping`（非法/非回环返回空串） |
+| `src/background.js` | 新增 `{type:'bnHookPing'}`：后台 `GET /bn-ping`（1.5 秒超时），只认 `spec === 'bn-agent-hook/1'` 才算活 |
+| `src/content.js` | `sendPackToAgent()` 分三态：`bn.hookOn === false`（用户手动关）什么都不做；未设置时先 ping，活着才投递并记住；已设置就照旧 |
+| `test/agenthook.test.mjs` | +5 条 `pingUrl`（带路径/只有 origin/多级路径/非回环/空值），46 → 51 |
+
+**为什么 ping 必须走后台**：内容脚本的 `fetch` 受页面 CORS 约束，而收件端不会给 `bilibili.com` 发 CORS 头——内容脚本探到的永远是「连不上」，会把自动发现变成永远不触发。
+
+### 真机跑出来的（真 Edge + 新 profile + `--load-extension=bili-notes` 1.4.34，BV1BgH36DE7y）
+
+| 场景 | 实测 |
+| --- | --- |
+| 从没设置过（`{}`）+ 收件端在跑 | 卡片那行：`已经送到本地 agent（2 集）：…\\inbox\\bn-study-【从零开始的 AI 学习】（S1 · 2 集学习包）.json（自动发现，已记住）` |
+| 落盘 | inbox 两份；`latest.bytes=935`；包体 `{spec:"bn-study-pack/1", id:"season:8719249", eps:2}` |
+| 投递后 storage | `{bn.hookAuto:true, bn.hookOn:true, bn.hookUrl:"http://127.0.0.1:8791/bn-pack"}` |
+| 用户手动关掉（`bn.hookOn:false`）再导 | 卡片没有投递那一行；inbox 仍是空；storage 没被改回 true |
+| 收件端没跑 + 从没设置过 | 静默（没有那一行），导出本身正常 |
+| 控制台 | 0 条异常 |
+| 截图 | `_lab/tour/141-pack-hook-auto.png`（自动发现成功）、`_lab/tour/142-pack-hook-off.png`（手动关闭后没有投递行） |
+
+### 边界
+
+- 自动发现只试 `DEFAULT_ENDPOINT`（`http://127.0.0.1:8791/bn-pack`）或用户已填的地址；没填也没装收件端时一次探测就结束，不留任何痕迹。
+- 一旦自动发现成功就把开关落盘 ⇒ 之后用户从设置页关掉，就真的不再送（`false` 是硬停）。
+- 收件端换了端口，自动发现不会自己找过去（不做端口扫描）；要么改设置页地址，要么用默认端口。

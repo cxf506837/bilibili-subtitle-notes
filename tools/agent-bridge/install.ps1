@@ -1,7 +1,7 @@
 ﻿# 把 bn-agent-bridge 装进「启动」目录：登录后自动跑，不弹窗。
 # 只写当前用户的 Startup 文件夹，不需要管理员权限。
 [CmdletBinding()]
-param([switch]$Uninstall, [switch]$Hook, [int]$Port = 8791)
+param([switch]$Uninstall, [switch]$Hook, [int]$Port = 8791, [string]$NodePath = "")
 
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -47,8 +47,10 @@ if (-not (Test-Path $bridge)) { throw ("找不到 " + $bridge) }
 # -Hook：只装「学习包收件端」（扩展设置里打开自动投递才用得上），不装下载目录监听。
 if ($Hook) {
   if (-not (Test-Path $hookPs1)) { throw ("找不到 " + $hookPs1) }
-  $cmd = Get-Command node -ErrorAction SilentlyContinue
-  if (-not $cmd) { throw "找不到 node.exe。装 Node.js 18+ 后重试。" }
+. (Join-Path $here "resolve-node.ps1")
+  $nodeExe = Resolve-NodeExe -Explicit $NodePath
+  Write-Output ("node: " + $nodeExe)
+  $hookArgs = $hookArgs + " -NodePath " + $Q + $nodeExe + $Q
   $sh0 = New-Object -ComObject WScript.Shell
   $s0 = $sh0.CreateShortcut($hookLnk)
   $s0.TargetPath = $psExe
@@ -60,7 +62,7 @@ if ($Hook) {
   Write-Output ("已装到开机启动 " + $hookLnk)
   Stop-Hook
   Start-Sleep -Milliseconds 400
-  $cli0 = $Q + $psExe + $Q + " -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " + $Q + $hookPs1 + $Q + " -Port " + $Port
+  $cli0 = $Q + $psExe + $Q + " -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " + $Q + $hookPs1 + $Q + " -Port " + $Port + " -NodePath " + $Q + $nodeExe + $Q
   $proc0 = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cli0 }
   if ($proc0.ReturnValue -ne 0) { throw ("启动收件端失败，WMI 返回 " + $proc0.ReturnValue) }
   Write-Output ("已在后台启动收件端，PID " + $proc0.ProcessId)

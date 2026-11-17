@@ -868,16 +868,43 @@ let packMd = null;
 
   // 导出之后自动把学习包送到用户自己跑的本地 agent（设置里默认关）。
   // 只允许本机回环地址：这份请求体里有整份学习包，不该发给任何外部域名。
+  // 自动发现：用户从没设置过开关时，问一句「本机收件端在不在」。
+  // 在就自动投递并记住；不在就完全静默（装了这个工具的人才会看到这一行）。
+  function pingAgent(url) {
+    return new Promise(function (res) {
+      let done = false;
+      const finish = function (r) { if (done) return; done = true; res(r || { ok: false }); };
+      try {
+        chrome.runtime.sendMessage({ type: 'bnHookPing', url: url }, function (r) {
+          if (chrome.runtime.lastError) { finish({ ok: false }); return; }
+          finish(r || { ok: false });
+        });
+      } catch (e) { finish({ ok: false }); }
+      setTimeout(function () { finish({ ok: false }); }, 2500);
+    });
+  }
+
+  // 导出之后自动把学习包送到用户自己跑的本地 agent（默认不设置就不做）。
+  // 只允许本机回环地址：这份请求体里有整份学习包，不该发给任何外部域名。
   async function sendPackToAgent(pack, text, fileName) {
     const H = window.BnAgentHook;
     if (!H) return;
     const st = await new Promise(function (res) {
       try { chrome.storage.local.get(['bn.hookOn', 'bn.hookUrl'], function (o) { res(o || {}); }); } catch (e) { res({}); }
     });
-    if (!st['bn.hookOn']) return;
+    const explicit = st['bn.hookOn'];
+    if (explicit === false) return;
     const url = H.cleanEndpoint(st['bn.hookUrl'] || H.DEFAULT_ENDPOINT);
-    if (!url) { setHookLine(H.resultLine({ ok: false, reason: 'no-endpoint' }), 'bad'); return; }
-    setHookLine('正在送到本地 agent…');
+    if (!url) { if (explicit) setHookLine(H.resultLine({ ok: false, reason: 'no-endpoint' }), 'bad'); return; }
+    let auto = false;
+    if (!explicit) {
+      const probe = await pingAgent(url);
+      if (!probe || !probe.ok) return;
+      auto = true;
+      setHookLine('检测到本机收件端，正在送…');
+    } else {
+      setHookLine('正在送到本地 agent…');
+    }
     const payload = H.buildPayload({
       pack: pack, text: text,
       file: { name: fileName, size: String(pack.json || '').length },
@@ -894,9 +921,12 @@ let packMd = null;
       } catch (e) { finish({ ok: false, reason: 'network', error: String(e && e.message || e) }); }
       setTimeout(function () { finish({ ok: false, reason: 'timeout' }); }, 5000);
     });
-    setHookLine(H.resultLine(resp), resp.ok ? 'ok' : 'bad');
+    const line = H.resultLine(resp);
+    setHookLine(auto && resp.ok ? line + '（自动发现，已记住）' : line, resp.ok ? 'ok' : 'bad');
+    if (auto && resp.ok) {
+      try { chrome.storage.local.set({ 'bn.hookOn': true, 'bn.hookUrl': url, 'bn.hookAuto': true }); } catch (e) {}
+    }
   }
-
   async function makeStudyPack() {
     const m = courseModel;
     if (!m) return;
