@@ -500,14 +500,15 @@
     if (num) num.textContent = n ? '已选 ' + n + ' 集' : '勾选集数后可只导出这几集';
     if (btn) {
       btn.textContent = n ? '导出选中（' + n + ' 集）' : '导出选中';
-      btn.disabled = !n;
       btn.classList.toggle('accent', n > 0);
     }
     const pk = foot.querySelector('.cpack');
     if (pk) {
       pk.textContent = n ? '交给 agent（' + n + ' 集）' : '交给 agent';
-      pk.disabled = !n;
     }
+    // 不再把两个按钮置 disabled：禁用按钮的样式和普通按钮一样（灰底、opacity 1），
+    // 用户点上去一点反馈都没有，看起来就是「点了没反应」。没勾集数时点它，
+    // 由 exportSelected / makeStudyPack 在状态条上说清楚该先勾哪个方框。
   }
 
   function renderCourseList() {
@@ -701,7 +702,7 @@
     const m = courseModel;
     if (!m) return;
     const picks = pickedEps();
-    if (!picks.length) { setStatus('warn', '先在课程清单里勾选集数'); return; }
+    if (!picks.length) { setStatus('warn', '还没勾集数', '上面清单里每集左边有个小方框：勾 1~2 集，再点这个按钮'); return; }
     if (state.batch && state.batch.running) {
       state.batch.cancel = true;
       setStatus('warn', '正在停止…', '这一集跑完就停，已导出的仍会落盘');
@@ -794,7 +795,7 @@
     const m = courseModel;
     if (!m) return;
     const picks = pickedEps();
-    if (!picks.length) { setStatus('warn', '先在课程清单里勾选集数'); return; }
+    if (!picks.length) { setStatus('warn', '还没勾集数', '上面清单里每集左边有个小方框：勾 1~2 集，再点这个按钮'); return; }
     if (!window.BnStudy || !window.BnConcept) { setStatus('bad', '学习包脚本没加载', '重新加载扩展再试'); return; }
     if (state.batch && state.batch.running) {
       state.batch.cancel = true;
