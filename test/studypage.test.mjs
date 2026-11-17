@@ -237,5 +237,45 @@ ok('不改动传进来的分组', bcGroups[0].items[0].anchors.length === 3);
   ok('masteryStats 空输入', st2.total === 0 && st2.weak === 0);
   ok('masteryStats 全懂时 weak 为 0', P.masteryStats([{ status: 'understood' }]).weak === 0);
 }
+// ---- 1.4.28：右栏「先看哪个」的分数抽出来共用 ----
+{
+  const shaky = P.conceptScore({ name: 'a', status: 'shaky', anchors: [{ t: 1 }] });
+  const unknown = P.conceptScore({ name: 'b', status: 'unknown', anchors: [{ t: 1 }] });
+  const understood = P.conceptScore({ name: 'c', status: 'understood', anchors: [{ t: 1 }] });
+  ok(shaky.score === 201 && shaky.reason.indexOf('半懂') === 0, 'conceptScore: 半懂 200 + 1 锚点 = 201');
+  ok(unknown.score === 101, 'conceptScore: 没考过 100 + 1 锚点');
+  ok(understood.score === 41, 'conceptScore: 懂了 40 + 1 锚点');
+  ok(P.conceptScore({ status: 'shaky', cross: true, anchors: [] }).score === 212, 'conceptScore: 跨集 +12');
+  ok(P.conceptScore({ status: 'shaky', suspect: true, anchors: [] }).score === 185, 'conceptScore: 可疑 -15');
+  ok(P.conceptScore({ status: 'shaky', anchors: new Array(30).fill({ t: 1 }) }).score === 210, 'conceptScore: 锚点加分封顶 +10');
+  ok(P.conceptScore({ status: 'unknown', cross: true, eps: [1, 2, 3], anchors: [{ t: 1 }] }).reason === '没考过，而且跨 3 集', 'conceptScore: 跨集理由带集数');
+  ok(P.conceptScore({}).score === 100, 'conceptScore: 空对象按没考过算');
+
+  const cards = [
+    { name: 'zzz 懂了', status: 'understood', eps: 5, list: [{ t: 1 }, { t: 2 }, { t: 3 }] },
+    { name: 'bbb 没考过', status: 'unknown', eps: 1, list: [{ t: 1 }] },
+    { name: 'aaa 半懂', status: 'shaky', eps: 1, list: [{ t: 1 }] },
+  ];
+  const sorted = P.sortByReview(cards);
+  ok(sorted.map(function (c) { return c.name; }).join('|') === 'aaa 半懂|bbb 没考过|zzz 懂了', 'sortByReview: 半懂 > 没考过 > 懂了');
+  ok(cards[0].name === 'zzz 懂了', 'sortByReview: 不动入参');
+  const tie = P.sortByReview([
+    { name: 'b', status: 'shaky', eps: 1, list: [{ t: 1 }] },
+    { name: 'a', status: 'shaky', eps: 1, list: [{ t: 1 }] },
+  ]);
+  ok(tie.map(function (c) { return c.name; }).join('') === 'ab', 'sortByReview: 同分按名字稳序');
+
+  // 右栏第一名 = 中栏打开「还没弄懂」后的第一张卡（同一套顺序，不是两套）
+  const rq = P.reviewQueue([
+    { name: 'x', status: 'unknown', cross: true, eps: [1, 2], anchors: [{ ep: 1, t: 5 }] },
+    { name: 'y', status: 'shaky', cross: false, eps: [3], anchors: [{ ep: 3, t: 9 }] },
+  ], { limit: 6 });
+  const weakSorted = P.sortByReview(P.filterByMastery([
+    { name: 'x', status: 'unknown', cross: true, eps: 2, list: [{ ep: 1, t: 5 }] },
+    { name: 'y', status: 'shaky', cross: false, eps: 1, list: [{ ep: 3, t: 9 }] },
+  ], 'weak'));
+  ok(rq[0].name === weakSorted[0].name, 'reviewQueue 与 sortByReview 的首位一致');
+}
+
 console.log('studypage: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

@@ -116,12 +116,50 @@
     };
   }
 
-  // 今天先看哪几个：拿到「合并后的概念列表」（CV.group(...).list，每项带 status/cross/suspect/anchors）
-  // 之后按「最接近忘掉的最先看」排序。纯函数，now 只为将来加时间衰减留口子。
-  //   shaky（半懂）   200  —— 差一点就会，回看收益最高
-  //   unknown / ''    100  —— 没考过，先看一眼也值
-  //   understood       40  —— 懂了，排最后；只有前面不够 6 个时才露头
+  // 「先看哪个」的分：右栏「今天先看这几个」和中栏「还没弄懂」共用这一套，
+  // 免得右栏说「先看这个」、中栏里它却排在第十屏。
+  //   shaky（半懂）   200 —— 差一点就会，回看收益最高
+  //   unknown / ''    100 —— 没考过，先看一眼也值
+  //   understood       40 —— 懂了，排最后
   //   跨集 +12、锚点多 +1/处（封顶 +10）、只在一集且和集标题没字面重合（suspect）−15
+  function conceptScore(c) {
+    const o = c || {};
+    const status = str(o.status);
+    const anchors = Array.isArray(o.anchors) ? o.anchors : (Array.isArray(o.list) ? o.list : []);
+    let score = status === 'shaky' ? 200 : status === 'understood' ? 40 : 100;
+    if (o.cross) score += 12;
+    if (o.suspect) score -= 15;
+    score += Math.min(10, anchors.length);
+    const eps = Array.isArray(o.eps) ? o.eps.length : (num(o.eps) || 0);
+    const reason = status === 'shaky' ? '半懂——最容易忘'
+      : status === 'understood' ? '已经懂了，隔几天回看'
+        : (o.cross ? '没考过，而且跨 ' + eps + ' 集' : '还没考过');
+    return { score: score, status: status, reason: reason };
+  }
+
+  // 把一批概念按同一套「先看哪个」重排（返回新数组，不动入参）。
+  // 中栏打开「还没弄懂」时用它：第一屏就是右栏推荐的那几个。
+  function sortByReview(cards) {
+    const arr = (Array.isArray(cards) ? cards : []).slice();
+    const cache = new Map();
+    const sc = function (c) {
+      if (!cache.has(c)) cache.set(c, conceptScore(c));
+      return cache.get(c);
+    };
+    arr.sort(function (a, b) {
+      const d = sc(b).score - sc(a).score;
+      if (d) return d;
+      const ea = Array.isArray(a && a.eps) ? a.eps.length : (num(a && a.eps) || 0);
+      const eb = Array.isArray(b && b.eps) ? b.eps.length : (num(b && b.eps) || 0);
+      if (eb !== ea) return eb - ea;
+      const na = str(a && a.name), nb = str(b && b.name);
+      return na < nb ? -1 : na > nb ? 1 : 0;
+    });
+    return arr;
+  }
+
+  // 今天先看哪几个：拿到「合并后的概念列表」（CV.group(...).list，每项带 status/cross/suspect/anchors）
+  // 之后按 conceptScore 排序，取前 limit 个。
   function reviewQueue(list, opts) {
     const o = opts || {};
     const limit = Math.max(1, num(o.limit) || 6);
@@ -132,17 +170,10 @@
       if (!name) return;
       const anchors = Array.isArray(c.anchors) ? c.anchors : [];
       if (!anchors.length) return;
-      const status = str(c.status);
-      let score = status === 'shaky' ? 200 : status === 'understood' ? 40 : 100;
-      if (c.cross) score += 12;
-      if (c.suspect) score -= 15;
-      score += Math.min(10, anchors.length);
-      const reason = status === 'shaky' ? '半懂——最容易忘'
-        : status === 'understood' ? '已经懂了，隔几天回看'
-          : (c.cross ? '没考过，而且跨 ' + (Array.isArray(c.eps) ? c.eps.length : 0) + ' 集' : '还没考过');
+      const sc = conceptScore(c);
       const a = anchors[0];
       out.push({
-        name: name, status: status, score: score, reason: reason,
+        name: name, status: sc.status, score: sc.score, reason: sc.reason,
         ep: num(a && a.ep), t: num(a && a.t),
         epLabel: str(a && a.epLabel) || ('第 ' + num(a && a.ep) + ' 集'),
         cross: !!c.cross,
@@ -313,6 +344,7 @@
     PREFIX: PREFIX, courses: courses, pick: pick, cidsOf: cidsOf, progressMap: progressMap,
     watched: watched, masteryOf: masteryOf, line: line, notesMap: notesMap, overview: overview,
     filterGroups: filterGroups, filterByView: filterByView, parseView: parseView, byConcept: byConcept,
-    filterByMastery: filterByMastery, masteryStats: masteryStats, reviewQueue: reviewQueue, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
+    filterByMastery: filterByMastery, masteryStats: masteryStats, reviewQueue: reviewQueue,
+    conceptScore: conceptScore, sortByReview: sortByReview, occurrences: occurrences, occSummary: occSummary, playerSrc: playerSrc,
   };
 });

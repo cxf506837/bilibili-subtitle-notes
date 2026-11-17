@@ -187,7 +187,7 @@ let weakOnly = false;   // 按概念时，只留「还没弄懂」的（半懂 /
     }
     if (q) parts.push('搜索「' + q + '」命中 ' + n + ' 个概念' + (view !== 'all' || byC ? '' : '，分布在 ' + shown.length + ' 集'));
     if (weakOnly && extra && extra.stats) {
-      parts.push('只看<b>还没弄懂</b>的：' + extra.stats.weak + ' / ' + extra.stats.total + ' 个');
+      parts.push('只看<b>还没弄懂</b>的：' + extra.stats.weak + ' / ' + extra.stats.total + ' 个，按「先看哪个」排');
     }
     box.hidden = !parts.length;
     box.innerHTML = parts.join(' · ');
@@ -286,7 +286,7 @@ let weakOnly = false;   // 按概念时，只留「还没弄懂」的（半懂 /
       const base = (view === 'cross') ? P.filterByView(filtered, 'cross', []) : filtered;
       const allCards = P.byConcept(base, { dropWatched: view === 'unwatched', watchedEps: watchedIdx(course) });
       const stats = P.masteryStats(allCards);
-      const cards = weakOnly ? P.filterByMastery(allCards, 'weak') : allCards;
+      const cards = weakOnly ? P.sortByReview(P.filterByMastery(allCards, 'weak')) : allCards;
       syncWeakBtn(stats);
       renderNote(course, filtered, [], grouped.totals, cards, { stats: stats, weakOnly: weakOnly });
       if (!cards.length) {
@@ -442,8 +442,33 @@ let weakOnly = false;   // 按概念时，只留「还没弄懂」的（半懂 /
     });
     const m = P.masteryOf(ALL, course && course.id);
     const foot = el('div', 'rfoot', m.total
-      ? '依据 agent 这次拷打的结果（' + (m.updated_at || '').replace('T', ' ').slice(0, 16) + '）；再考一次，这张卡会跟着变。'
+      ? '依据 agent 这次拷打的结果' + (m.updated_at ? '（' + m.updated_at.replace('T', ' ').slice(0, 16) + '）' : '') + '；再考一次，这张卡会跟着变。'
       : '还没导入掌握度：现在按「跨集 / 锚点多」挑，导入后会按懂没懂重排。');
+    // 和中栏「还没弄懂」是同一套排序，这里给一条走到全部的入口，别让两边各说各的。
+    const weakAll = (g ? g.list : []).filter(function (c) {
+      return String((c && c.status) || '') !== 'understood' && ((c && c.anchors) || []).length;
+    }).length;
+    if (weakAll > qs.length) {
+      const all = el('button', 'rall', '看全部 ' + weakAll + ' 个 →');
+      all.type = 'button';
+      all.title = '中栏切到「按概念」并打开「还没弄懂」，按同一套顺序排';
+      all.onclick = function () {
+        mode = 'concept';
+        weakOnly = true;
+        // 排法按钮的选中态要跟着改，否则会出现「按集 高亮、内容却是按概念」。
+        document.querySelectorAll('.mbtn[data-mode]').forEach(function (x) {
+          const on = x.getAttribute('data-mode') === 'concept';
+          x.classList.toggle('on', on);
+          x.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        const inp = $('q');
+        if (inp && inp.value) { inp.value = ''; q = ''; }
+        // 必须把 course 传进去：renderGroups() 无参时按「这门课还没有集」收场（踩过一次）。
+        const c = P.pick(P.courses(ALL), courseId);
+        if (c) renderGroups(c);
+      };
+      box.appendChild(all);
+    }
     box.appendChild(foot);
   }
 

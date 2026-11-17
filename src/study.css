@@ -120,3 +120,5 @@ a.t:hover { text-decoration:underline; }
 .review .rmeta { font-size:11px; color:var(--sub); white-space:nowrap; font-variant-numeric:tabular-nums; }
 .review .rwhy { display:block; font-size:11px; color:var(--sub); margin-top:1px; }
 .review .rfoot { font-size:11px; color:var(--sub); margin-top:6px; }
+.review .rall { display:block; width:100%; margin:10px 0 0; padding:7px 10px; border:1px solid var(--bnaccent); border-radius:6px; background:#fff; color:var(--bnaccent); font-size:12.5px; line-height:1.4; cursor:pointer; }
+.review .rall:hover { background:#f2fbfe; }
