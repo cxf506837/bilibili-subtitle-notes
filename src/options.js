@@ -8,6 +8,15 @@ function show(text, bad) {
   msg.style.color = bad ? '#e74c3c' : '#2ecc71';
 }
 
+// 本地 agent 端点判定直接用扩展里的同一份实现（src/agenthook.js），别在设置页另写一套。
+function bnAgentHookLocal(url) {
+  try {
+    const H = globalThis.BnAgentHook;
+    if (H && H.isLocalEndpoint) return H.isLocalEndpoint(url);
+  } catch (e) {}
+  return /^http:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?(\/|$)/.test(String(url || ''));
+}
+
 // 白名单的唯一来源是 manifest 的 host_permissions：加权限只改一处，这里自动跟上。
 const PATTERNS = (function () {
   try {
@@ -52,7 +61,7 @@ function presetIdFor(apiBase) {
 
 renderPresets();
 
-chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled', 'bn.goal', 'bn.autoNotes', 'bn.capVideo', 'bn.capDay'], (r) => {
+chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEnabled', 'bn.visualEnabled', 'bn.goal', 'bn.autoNotes', 'bn.capVideo', 'bn.capDay', 'bn.hookOn', 'bn.hookUrl'], (r) => {
   const apiBase = r.apiBase || 'https://api.deepseek.com/v1';
   $('apiBase').value = apiBase;
   $('model').value = r.model || 'deepseek-chat';
@@ -65,6 +74,8 @@ chrome.storage.local.get(['apiBase', 'model', 'apiKey', 'maxTokens', 'bn.awayEna
   $('autoNotes').checked = r['bn.autoNotes'] === true;
   $('capVideo').value = Number(r['bn.capVideo']) >= 0 ? Number(r['bn.capVideo']) : 120000;
   $('capDay').value = Number(r['bn.capDay']) >= 0 ? Number(r['bn.capDay']) : 600000;
+  $('hookOn').checked = r['bn.hookOn'] === true;
+  $('hookUrl').value = r['bn.hookUrl'] || 'http://127.0.0.1:8791/bn-pack';
 });
 
 $('save').addEventListener('click', () => {
@@ -81,7 +92,11 @@ $('save').addEventListener('click', () => {
   const autoNotes = $('autoNotes').checked;
   const capVideo = Math.max(0, Number($('capVideo').value) || 0);
   const capDay = Math.max(0, Number($('capDay').value) || 0);
-  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled, 'bn.goal': goal, 'bn.autoNotes': autoNotes, 'bn.capVideo': capVideo, 'bn.capDay': capDay }, () => {
+  const hookOn = $('hookOn').checked;
+  const hookUrl = $('hookUrl').value.trim() || 'http://127.0.0.1:8791/bn-pack';
+  // 只许本机：这份请求体里有整份学习包，填外部域名一律拒绝保存。
+  if (hookOn && !bnAgentHookLocal(hookUrl)) return show('本地 agent 接口只能是 http://127.0.0.1:端口/路径 或 http://localhost:端口/路径', true);
+  chrome.storage.local.set({ apiBase, model, apiKey, maxTokens, 'bn.awayEnabled': awayEnabled, 'bn.visualEnabled': visualEnabled, 'bn.goal': goal, 'bn.autoNotes': autoNotes, 'bn.capVideo': capVideo, 'bn.capDay': capDay, 'bn.hookOn': hookOn, 'bn.hookUrl': hookUrl }, () => {
     show('已保存。回到 B站 视频页刷新即可生效。');
   });
 });

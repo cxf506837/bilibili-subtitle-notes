@@ -74,6 +74,8 @@
 '.packout .po2 { margin-top: 3px; color: #14161a; word-break: break-all; font-size: 11px; }',
 '.packout .po3 { display: flex; align-items: center; gap: 8px; margin-top: 6px; }',
 '.packout .poh { flex: 1; min-width: 0; color: var(--bnmuted); font-size: 11px; }',
+'.packout .poh.ok { color: #1f8b45; }',
+'.packout .poh.bad { color: #b25e00; }',
 '.autobar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 10px 8px; padding: 7px 9px; font-size: 12px; line-height: 1.5; border: 1px solid var(--bnline); border-radius: 6px; background: var(--bnfill); }',
 '.autobar .at { flex: 1 1 100%; color: var(--bnmuted); }',
 '.autobar.hidden { display: none; }',
@@ -303,6 +305,7 @@
     '<div class="po1"><span class="pot">学习包已导出</span><span class="pom" id="packOutMeta"></span><button class="btn sm pox" id="packOutHide" title="收起这条">✕</button></div>',
     '<div class="po2 mono" id="packOutName"></div>',
     '<div class="poh" id="packOutHint"></div>',
+    '<div class="poh hidden" id="packOutHook"></div>',
     '<div class="po3"><button class="btn sm accent" id="packOutCopy">复制「交给 agent 的话」</button><button class="btn sm" id="packOutMd" title="把这份学习包的 Markdown 存到下载目录（带时间戳、可直接看）">存 Markdown</button></div>',
     '</div>',
     '<div class="autobar hidden" id="autoBar">',
@@ -388,6 +391,7 @@
     const packOutHintEl = $('packOutHint');
     const packOutCopyEl = $('packOutCopy');
 const packOutMdEl = $('packOutMd');
+const packOutHookEl = $('packOutHook');
     const packOutHideEl = $('packOutHide');
   const dot = $('dot');
   const costEl = $('cost');
@@ -855,6 +859,44 @@ let packMd = null;
     setStatus('ok', '已存 ' + packMd.name, '在下载目录；.json 给 agent，.md 自己看');
   });
 
+  function setHookLine(text, kind) {
+    if (!packOutHookEl) return;
+    packOutHookEl.classList.remove('hidden');
+    packOutHookEl.className = 'poh' + (kind ? ' ' + kind : '');
+    packOutHookEl.textContent = text;
+  }
+
+  // 导出之后自动把学习包送到用户自己跑的本地 agent（设置里默认关）。
+  // 只允许本机回环地址：这份请求体里有整份学习包，不该发给任何外部域名。
+  async function sendPackToAgent(pack, text, fileName) {
+    const H = window.BnAgentHook;
+    if (!H) return;
+    const st = await new Promise(function (res) {
+      try { chrome.storage.local.get(['bn.hookOn', 'bn.hookUrl'], function (o) { res(o || {}); }); } catch (e) { res({}); }
+    });
+    if (!st['bn.hookOn']) return;
+    const url = H.cleanEndpoint(st['bn.hookUrl'] || H.DEFAULT_ENDPOINT);
+    if (!url) { setHookLine(H.resultLine({ ok: false, reason: 'no-endpoint' }), 'bad'); return; }
+    setHookLine('正在送到本地 agent…');
+    const payload = H.buildPayload({
+      pack: pack, text: text,
+      file: { name: fileName, size: String(pack.json || '').length },
+      now: Date.now(),
+    });
+    const resp = await new Promise(function (res) {
+      let done = false;
+      const finish = function (r) { if (done) return; done = true; res(r || { ok: false, reason: 'network' }); };
+      try {
+        chrome.runtime.sendMessage({ type: 'bnHook', url: url, payload: payload }, function (r) {
+          if (chrome.runtime.lastError) { finish({ ok: false, reason: 'network', error: chrome.runtime.lastError.message }); return; }
+          finish(r);
+        });
+      } catch (e) { finish({ ok: false, reason: 'network', error: String(e && e.message || e) }); }
+      setTimeout(function () { finish({ ok: false, reason: 'timeout' }); }, 5000);
+    });
+    setHookLine(H.resultLine(resp), resp.ok ? 'ok' : 'bad');
+  }
+
   async function makeStudyPack() {
     const m = courseModel;
     if (!m) return;
@@ -976,6 +1018,7 @@ let packMd = null;
         hint: (packCopied ? '「交给 agent」的话已经放进剪贴板' : '点左边按钮，把「交给 agent」的话复制到剪贴板') + '；想自己看就点「存 Markdown」',
         text: packHandText,
       });
+      sendPackToAgent(pack, packHandText, pack.baseName + '.json');
     } finally {
       state.batch.running = false;
     }

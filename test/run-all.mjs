@@ -34,6 +34,7 @@ const FILES = [
   'exporthint.test.mjs', // 合集页点「导出」时提醒一次「交给 agent」在哪
   'packcard.test.mjs', // 导出学习包后的结果卡片：文件名 + 复制 + 存 Markdown
   'agentbridge.test.mjs', // 小助手：盯下载目录 → 把 agent 窗口拉到前面
+  'agenthook.test.mjs',  // 本地 agent 接口：只许本机 / 请求体 / 收件端真收一次
   'realdata.test.mjs',    // 60 条真实样本回归
 ];
 

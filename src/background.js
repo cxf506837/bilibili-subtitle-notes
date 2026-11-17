@@ -3,6 +3,8 @@
 
 // 学习页 URL 的拼法在 src/studylink.js（纯函数，单测在 test/studylink.test.mjs）。
 try { importScripts('studylink.js'); } catch (e) {}
+// 本地 agent 接口：端点合法性 / 请求体在 src/agenthook.js（纯函数，单测见 test/agenthook.test.mjs）。
+try { importScripts('agenthook.js'); } catch (e) {}
 
 function fnv1a(str) {
   let h = 0x811c9dc5;
@@ -195,6 +197,30 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       try { endpoint = new URL(cfg.apiBase).host; } catch (e) {}
       return { ok: true, endpoint: endpoint, model: cfg.model, hasKey: !!cfg.apiKey, ocr: ocr };
     })().then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e).slice(0, 200) }));
+    return true;
+  }
+  if (msg && msg.type === 'bnHook') {
+    // 把学习包 POST 到用户自己跑的本地 agent 收件端。
+    // 走后台而不是内容脚本：内容脚本的 fetch 受页面 CORS 约束，后台带着 host_permissions 不受。
+    (async () => {
+      const H = (typeof BnAgentHook !== 'undefined') ? BnAgentHook : null;
+      if (!H) return { ok: false, reason: 'network', error: 'agenthook.js 没加载' };
+      const url = H.cleanEndpoint(msg.url);
+      if (!url) return { ok: false, reason: 'no-endpoint' };
+      try {
+        const r = await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(msg.payload || {}),
+        }, 3000);
+        if (!r.ok) return { ok: false, reason: 'bad-response', error: 'HTTP ' + r.status };
+        const j = await r.json().catch(() => null);
+        return (j && j.ok) ? { ok: true, saved: String(j.saved || ''), counts: (msg.payload && msg.payload.counts) || null } : { ok: false, reason: 'bad-response' };
+      } catch (e) {
+        const aborted = e && (e.name === 'AbortError' || String(e).indexOf('aborted') >= 0);
+        return { ok: false, reason: aborted ? 'timeout' : 'network', error: String(e && e.message || e).slice(0, 160) };
+      }
+    })().then(sendResponse).catch((e) => sendResponse({ ok: false, reason: 'network', error: String(e).slice(0, 160) }));
     return true;
   }
   if (msg && msg.type === 'openStudy') {

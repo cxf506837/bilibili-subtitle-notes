@@ -61,6 +61,11 @@
 <textarea id="goal" rows="3" placeholder="例如：三周内能独立用 DSH 跑通一个自动化任务；重点搞懂 skills、判据、回滚"></textarea>
 <div class="hint">只写进「学习包」（课程条里点「交给 agent」导出的那份），让 agent 知道该往哪裁；不填也能用。</div>
 
+<label>本地 agent（可选）</label>
+<label class="row"><input type="checkbox" id="hookOn" /> 导出学习包后自动送到我本机跑的 agent（只发 127.0.0.1，不经过任何服务器）</label>
+<input id="hookUrl" placeholder="http://127.0.0.1:8791/bn-pack" />
+<div class="hint">收件端在仓库 <code>tools/agent-bridge/bn-agent-hook.mjs</code>：<code>node bn-agent-hook.mjs</code> 起在 127.0.0.1:8791。它把学习包写进本机目录并把 agent 窗口拉到前面；你自己的 agent 只要能读文件就能接。只允许本机地址，填外部域名会被拒绝。</div>
+
 <button id="save">保存</button>
 <button id="test" style="background:#666">测试连接</button>
 <div id="msg"></div>
@@ -71,6 +76,7 @@
 </div>
 
 <script src="endpoint.js"></script>
+<script src="agenthook.js"></script>
 <script src="options.js"></script>
 </body>
 </html>

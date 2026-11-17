@@ -1260,3 +1260,52 @@ setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 60
 - 这张卡只在本次导出成功后出现；收起后再刷新页面就没了（不做历史列表）。
 - 「存 Markdown」用的是内存里的 `packMd`，刷新页面后点它会提示「这份 Markdown 已经没了」。
 - 卡片不会替用户判断「到底该点哪个」——工具栏的「导出」（单集）与课程清单的「交给 agent（N 集）」仍是两个入口，1.4.30 的提醒继续负责把用户指过去。
+
+## 四十五、把学习包直接送到本机的 agent（1.4.33）
+
+起因是用户一句话：「这是做给大家用的吧，要不加个自动链接本地 agent 的功能？反正人家也是自行用 agent 部署」。
+
+先把边界说清楚：扩展能做到的自动，止步于「把文件交到你自己起的那个端点」。**不替用户操作他的工具**——不往 agent 窗口里打字、不模拟回车。理由是本机 DSH 的 web 接口（`/api/health`、`/api/sessions`）无 token 一律 401，而拿 token 去冒充用户发消息，属于替用户按键盘，不做。
+
+### 做了什么
+
+| 位置 | 改动 | 为什么 |
+| --- | --- | --- |
+| `src/agenthook.js`（新） | `bn-agent-hook/1` 协议：`isLocalEndpoint` / `cleanEndpoint` / `buildPayload` / `resultLine` | 端点校验、投递体、回执文案这三件事都能在 node 里测；放进内容脚本里就只能真机试 |
+| `src/background.js` | `importScripts('agenthook.js')` + `{type:'bnHook'}` 分支，`fetchWithTimeout(...,3000)` | **必须走后台**：内容脚本的 fetch 受页面 CORS 约束，后台带 `host_permissions` 不受；`127.0.0.1` 本来就在 manifest 里，不用加权限 |
+| `src/content.js` | 结果卡片多一行 `#packOutHook`；`sendPackToAgent()` 在 `showPackOut()` 之后不 await 地发一次 | 投递结果要落在用户刚看过的那张卡上，而不是状态条（状态条会被下一次操作覆盖） |
+| `src/options.html` / `src/options.js` | 「本地 agent（可选）」开关 + 接口地址；保存时先用 `isLocalEndpoint` 挡一遍 | 默认关闭；地址写错（比如 https 或外网域名）在保存时就拦，别等导出时才发现 |
+| `tools/agent-bridge/bn-agent-hook.mjs`（新） | 只绑 `127.0.0.1` 的收件端：`GET /bn-ping`、`POST /bn-pack` | 用户自己一行命令起它；8MB 上限、spec 校验、同名不覆盖 |
+| `tools/agent-bridge/start-hook.ps1`（新）、`install.ps1` 加 `-Hook` | 开机自启（Startup 快捷方式）+ WMI 起进程 | 和 1.4.29 的窗口监听用同一套安装脚本，不新增依赖 |
+| `docs/agent-integration.md` 第 9 节、`tools/agent-bridge/README.md` | 协议、失败文案、两种接法、A/B 两路对比 | |
+| `test/agenthook.test.mjs`（新，46 条） | 端点 15 / 投递体 8 / 回执 7 / 文件名 4 / 真起收件端 12 | 端点校验是安全边界，`127.0.0.1.evil.com` 这类必须挡 |
+| `manifest.json` | 1.4.32 → 1.4.33；content_scripts 里 `queueplan.js` 之后插入 `agenthook.js` | |
+
+投递体只发学习包本身（`pack: pack.doc || pack`），不发 `{doc, json, md, baseName}` 那层包装——收件端拿到的东西要和用户从下载目录里点开的那份一模一样。
+
+### 真机跑出来的（真 Edge + 新 profile + `--load-extension=bili-notes`，BV1BgH36DE7y 合集 25 集）
+
+只替换网络边界上的 `window.BnGate.gateSubtitle`（固定返回一份 `stable` 字幕），其余全真跑。
+
+| 场景 | 实测 |
+| --- | --- |
+| 收件端起 | `GET /bn-ping` → `{ok:true, spec:"bn-agent-hook/1", inbox:"…\\Temp\\bn-hook6-inbox-…", pid:…}` |
+| 勾 2 集后点「交给 agent（2 集）」 | 卡片多一行绿色：`已经送到本地 agent（2 集）：%TEMP%\\bn-hook6-inbox-…\\bn-study-【从零开始的 AI 学习】（S1 · 2 集学习包）.json` |
+| 收件端目录 | 两份：学习包 `.json` + `latest.json`；`latest.bytes=935`、`hasText=true` |
+| 落盘的那份包 | `{spec:"bn-study-pack/1", course.id:"season:8719249", counts.episodes:2}` —— 就是学习包本身，没有包装层 |
+| 收件端关掉再导一次 | 卡片那行变橙色 `连不上本地 agent：收件端没启动，或端口不对`；导出照常成功（文件仍下载、剪贴板仍在） |
+| 控制台 | 0 条异常 |
+| 截图 | `_lab/tour/138-pack-hook.png`（成功）、`_lab/tour/139-pack-hook-fail.png`（失败） |
+
+### 这次踩到的三个事实（跟产品无关，但会让验证白跑）
+
+1. **面板整块在 shadow DOM 里**：host 是 `#bn-root`。`document.querySelector('#courseList')`、`'#packOut'` 一律 null；第一版探针因此报 `rows=0`、按钮 `rect=null`，看起来像「合集数据没来」。必须先在隔离世界里 `document.getElementById('bn-root').shadowRoot` 再查。
+2. **点课程清单底部的按钮前必须 `scrollIntoView`**：`#cpack` 的 `getBoundingClientRect().top` 是 1063，而视口高 1281 时它在列表滚动区之外，`Input.dispatchMouseEvent` 打上去什么也不会发生（连 hover 都没有）。`b.scrollIntoView({block:'center'})` 之后 top=378，一次点中。
+3. 勾选不需要鼠标手势（`element.click()` 够），**下载和剪贴板需要**（`Input.dispatchMouseEvent`）。所以一个流程里两种点法要混用。
+
+### 边界
+
+- 只连本机回环：`http` + `127.0.0.1` / `localhost` / `[::1]` / `127.x.y.z`，端口 1..65535；`https://127.0.0.1` 也不收（要证书，普通用户配不起来）。
+- 默认关闭，开关在设置页；关着的时候导出行为和 1.4.32 完全一样（不试连接、不报错）。
+- 投递是「尽力而为」：3 秒超时、不重试、失败只写在卡片那一行，不影响导出本身。
+- 收件端不校验包体结构，只看 `spec` 和 `pack.course`——它是投递箱，不是校验器；包的格式由 `src/study.js` 和 `docs/agent-integration.md` 定义。

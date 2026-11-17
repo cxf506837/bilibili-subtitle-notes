@@ -186,3 +186,66 @@ agent 拷打完写到 study-state.json，再让插件面板读它，标出「哪
 - 字段只加不改；改语义升 /2。
 - 面板只认 `course_id` 一致的那一份：合集是 `season:<合集id>`，多 P / 单视频是 `video:<BV号>`。写错 course_id 会「应用成功但面板不显示」。
 - 同一门课只留最后一次应用的版本（按 updated_at 显示「已经应用过了」），不做历史合并。
+
+## 9. 自动投递：把学习包直接送到你本机的 agent（v1.4.33 起）
+
+前八节都要人做一步：把文件交给 agent。这一节把那一步缩到「点一下导出」。
+
+扩展在设置页有一个可选项：**「导出学习包后自动送到我本机跑的 agent」**（默认关）。打开后，点「交给 agent（N 集）」成功时，扩展会把整份学习包 POST 到 `http://127.0.0.1:8791/bn-pack`。
+
+**为什么只许本机。** 请求体里有整份学习包（含逐字原话）。端点校验只认 `127.0.0.1` / `localhost` / `[::1]` / `127.x.y.z`，`127.0.0.1.evil.com` 这种前缀骗术也会被拒；填外部域名设置页直接不让保存。协议里没有 token，因为它压根出不了这台机器。
+
+**你需要有一个收件端。** 仓库里带一个（Node 18+，零依赖）：
+
+```bash
+node tools/agent-bridge/bn-agent-hook.mjs            # 前台跑，127.0.0.1:8791
+node tools/agent-bridge/bn-agent-hook.mjs --port 9000 --inbox D:/bn-inbox --no-focus
+```
+
+Windows 上可以装成开机自启：`powershell -File tools/agent-bridge/install.ps1 -Hook`。
+
+收件端收到的文件写到 `%LOCALAPPDATA%\bn-agent-bridge\inbox\`（或 `--inbox` 指定），并同步更新 `latest.json`。
+
+### 协议 bn-agent-hook/1
+
+```
+POST /bn-pack
+{
+  "spec": "bn-agent-hook/1",
+  "sentAt": "2026-11-17T07:41:02.000Z",
+  "source": "bili-notes",
+  "course": { "id": "season:8719249", "title": "【从零开始的 AI 学习】" },
+  "scope": "S2",
+  "counts": { "episodes": 9, "notes": 46, "concepts": 91, "anchors": 215 },
+  "file": { "name": "bn-study-….json", "size": 366765 },
+  "text": "去下载目录找最新的 bn-study-*.json…",
+  "pack": { "spec": "bn-study-pack/1", "…": "完整学习包" }
+}
+→ 200 { "ok": true, "saved": "<绝对路径>", "counts": {...}, "bytes": 366765 }
+→ 400 spec 不对 / 不是 JSON / 缺 pack    → 413 超过 8MB
+
+GET /bn-ping → 200 { "ok": true, "spec": "bn-agent-hook/1", "inbox": "<目录>", "pid": 1234 }
+```
+
+`pack` 是学习包本身（`bn-study-pack/1`），不是扩展内部的 `{doc,json,md,baseName}` 包装——收件端原样落盘，agent 打开就是能直接读的那份。
+
+### 失败时用户看到什么
+
+| 情况 | 卡片上那一行 |
+|---|---|
+| 成功 | 已经送到本地 agent（9 集）：C:\…\bn-study-….json |
+| 收件端没起 / 端口不对 | 连不上本地 agent：收件端没启动，或端口不对 |
+| 3 秒没回 | 本地 agent 没响应（3 秒超时）：先确认收件端在跑 |
+| 端点填错 | 本地 agent 接口没填或不在本机：设置里填 http://127.0.0.1:8791/bn-pack |
+| 回了怪东西 | 本地 agent 回了看不懂的内容：看一眼收件端日志 |
+
+投递失败**不影响导出**：文件已经下载好了，那句话也还在剪贴板里。
+
+### 你的 agent 怎么接
+
+两种，任选：
+
+1. **读文件**（最简单，不用写服务）：让它读 `%LOCALAPPDATA%\bn-agent-bridge\inbox\latest.json`，再读里面 `file` 指向的那份。
+2. **自己实现 `/bn-pack`**：任何语言都行，按上面的协议返回 `{ok:true, saved:"…"}` 即可；端口不是 8791 就在扩展设置里改。
+
+这一节和第 1 节的「约定文件名前缀」不冲突：自动投递失败时，退回「找下载目录里最新的 `bn-study-*.json`」那条路仍然有效。
