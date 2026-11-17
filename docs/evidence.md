@@ -1103,3 +1103,45 @@ B站 的 `x/web-interface/view` 里，合集是 `ugc_season`（id / title / sect
 - 只在 Windows + PowerShell 5.1 上验过；macOS 没有对应实现。
 
 测试：`test/agentbridge.test.mjs` 28 条静态断言（BOM / CRLF / ALT 解锁 / WMI 启动 / 排除自检进程 / 不做 SendKeys）；`test/studyplan.test.mjs` 56 条含 `safeDirName` / `outDirFor` / `ensureDir` 11 条；`test/packhandoff.test.mjs` 41 条含前缀与「最新的」6 条。
+
+## 四十二、点「导出」时提醒一次「交给 agent」在哪（1.4.30）
+
+用户报障（2026-11-17）：「重新打开了，但点击导出并没有跳转到 agent」。查下来桥没坏——`%USERPROFILE%\Downloads` 里那两个 `.md` 是单视频字幕导出（`【Re_从零开始的AI学习】AI 这三年发生了什么？.md`），根本没有 `bn-study-*.json` 落盘，`bridge.log` 停在自测那次。
+
+根因是**点错了按钮**：面板工具栏的「导出」只导出当前这一集；要整门课，得展开顶部课程条、勾几集、再点清单底部的「交给 agent（N 集）」。两个按钮都在同一个面板里，前者更显眼，第一次用的人几乎必点错。
+
+用户选了「A：点『导出』时提醒一次」，不改布局。
+
+### 做了什么
+
+| 位置 | 改动 | 为什么 |
+| --- | --- | --- |
+| `src/content.js` | `maybeHintCoursePack()`：合集/多P 且 ≥2 集时，在状态条上写一句「刚导出的是这一集（N 集里的这一集）」，并把「点课程条 → 勾几集 → 交给 agent（N 集）」放进 title | 只说「你导错了」没有用，得给出下一步怎么走 |
+| 同上 | 按 `bn.packHint.<bvid>` 记一次，同一集只提醒一次 | 天天弹同一句话就成了噪音 |
+| 同上 | `state.status === 'bad'` 时直接 return | 登录提示、字幕不可读这类信息更急，不能被提醒盖掉 |
+| 同上 | 新增 `exportMarkdownFromButton()` 包一层，`#btnExport` 改指它 | 导出逻辑本身不动，只在旁边挂一句提醒 |
+
+### 真机跑出来的（新 profile + `--load-extension=bili-notes`，BV1TDGT6vEqC）
+
+| 项 | 实测 |
+| --- | --- |
+| 未登录时点「导出」 | 状态条保持「请先登录 B站」，`localStorage` 里没有 `bn.packHint.*`（守门生效，不抢更急的提示） |
+| 正常状态下点「导出」 | 120ms 起状态条「刚导出的是这一集（25 集里的这一集）」 |
+| 同一句的 title | 「要整门课交给 agent：点顶部课程条展开清单 → 勾几集 → 点「交给 agent（N 集）」。文件名以 bn-study- 开头，agent 按最新那个找」 |
+| 再点一次 | 不再提醒（`bn.packHint.BV1TDGT6vEqC` 已是 `1`） |
+| 截图 | `_lab/tour/134-export-hint.png`（1865×1922，面板顶部就是那行提醒） |
+
+「正常状态」是怎么来的：这台机器没登录 B站，所有视频的字幕接口都读不到，所以验证时用 CDP 连进扩展的隔离世界（`Runtime.executionContextCreated` 里挑 `name === 'B站字幕笔记'` 且 `auxData.isDefault === false`），把 `window.__bnState.status` 置成 `'ok'` 再点按钮。**置的只是「字幕这关过了」这个前置条件，点的是真按钮、走的是真 `maybeHintCoursePack()`、写的是真 `localStorage`。**
+
+### 两个坑
+
+1. **`process.exit(0)` 不会关掉浏览器**。下一次用同一个端口 `fetch('/json/list')` 会连到上一轮那个还开着的 Edge，读到的是旧页面旧代码（甚至 `localStorage` 里已经有上一轮的 key），于是「改完了没生效」「守门没起作用」全是假象。每次跑前先按命令行 `Stop-Process` 清 `msedge.exe`，并且换一个端口。
+2. **改 `content.js` 后旧标签页不会自己换代码**，必须重新加载扩展/重开浏览器；但 `chrome.runtime.getManifest().version` 会是新的——**版本号不能当「代码已生效」的证据**（这条在 1.4.25 又踩过一次）。
+
+### 边界
+
+- 只提醒一次，按 bvid 记；换了视频还会再提醒一次。
+- 单集视频、番剧播放页不提醒（`courseModel.kind === 'single'` 或集数 < 2）。
+- 提醒只是「告诉你另一个按钮在哪」，不替用户勾集、不替用户点。
+
+测试：`test/exporthint.test.mjs` 9 条源码断言（绑定的是包装函数 / 单集早退 / 少于两集早退 / `bad` 状态早退 / 按 bvid 只记一次 / 文案点名「交给 agent（N 集）」与 `bn-study-` 前缀 / 不用 `alert`）；做变异测试（删掉 `bad` 守卫）能钓出 1 条 FAIL。

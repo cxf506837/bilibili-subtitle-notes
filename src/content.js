@@ -3648,6 +3648,30 @@
     downloadMarkdown(state.notes.length ? buildMarkdown() : buildTranscriptMarkdown());
   }
 
+  // 合集页面里，「导出」只导出当前这一集——但工具栏上它离鼠标最近，
+  // 很多人以为这就是「交给 agent」。点错一次就要回去找课程清单（用户实测踩过），
+  // 所以第一次点「导出」时在状态条上明说一次，同一集不再重复。
+  function maybeHintCoursePack() {
+    // 导出失败时不抢话：登录提示、字幕不可读这类才是更急的信息
+    if (state.status === 'bad') return;
+    const m = courseModel;
+    if (!m || m.kind === 'single') return;
+    const n = (m.episodes || []).length;
+    if (n < 2) return;
+    const key = 'bn.packHint.' + (state.bvid || '');
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch (e) {}
+    setStatus('warn', '刚导出的是这一集（' + n + ' 集里的这一集）',
+      '要整门课交给 agent：点顶部课程条展开清单 → 勾几集 → 点「交给 agent（N 集）」。文件名以 bn-study- 开头，agent 按最新那个找');
+  }
+
+  function exportMarkdownFromButton() {
+    exportMarkdown();
+    maybeHintCoursePack();
+  }
+
   // 合集 / 多 P 批量导出：逐 P 取样、逐 P 过闸门，只把真的属于那一 P 的字幕拼进文件。
   // 慢是必然的（每 P 至少两次取样），所以有进度、能中途停，也写明「哪几 P 没导出、为什么」。
   async function exportAllParts() {
@@ -3942,7 +3966,7 @@
     const hid = outline.classList.toggle('hidden');
     this.textContent = hid ? '大纲 ▸' : '大纲 ▾';
   });
-  $('btnExport').addEventListener('click', exportMarkdown);
+  $('btnExport').addEventListener('click', exportMarkdownFromButton);
   $('btnMulti').addEventListener('click', exportAllParts);
   $('btnAll').addEventListener('click', function () { if (state.allRun) stopAll(); else startAll(); });
   // 默认不自动花钱：第一次有段落被「看着看完」时才问一次，答完记住（同一个浏览器不再问）
