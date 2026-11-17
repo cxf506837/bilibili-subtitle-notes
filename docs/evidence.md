@@ -1199,7 +1199,7 @@ status after 0-pick click: （没变）
 
 1.4.31 修掉了「没勾集数时按钮是 disabled 死键」，但用户再说一次「没有任何反应」。这次先去找文件，而不是再猜代码：
 
-`C:\Users\Admin\Downloads\bn-study-【从零开始的 AI 学习】（S2 · 1 集学习包）.json`，2565 B，15:04:25 落盘。解析出来是完整的 `bn-study-pack/1`：
+`%USERPROFILE%\Downloads\bn-study-【从零开始的 AI 学习】（S2 · 1 集学习包）.json`，2565 B，15:04:25 落盘。解析出来是完整的 `bn-study-pack/1`：
 
 | 字段 | 值 |
 | --- | --- |
