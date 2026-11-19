@@ -1374,3 +1374,17 @@ setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 60
 - 自动发现只试 `DEFAULT_ENDPOINT`（`http://127.0.0.1:8791/bn-pack`）或用户已填的地址；没填也没装收件端时一次探测就结束，不留任何痕迹。
 - 一旦自动发现成功就把开关落盘 ⇒ 之后用户从设置页关掉，就真的不再送（`false` 是硬停）。
 - 收件端换了端口，自动发现不会自己找过去（不做端口扫描）；要么改设置页地址，要么用默认端口。
+
+
+## 二十八、干净 profile 陌生人安装演练（2026-11-19，1.4.35）
+
+发布的 zip 解压到一个空目录、放进全新的 Edge user-data-dir（`_lab\stranger\ud2`，未登录 B站、无任何设置），按 README 四步装一遍，只用 CDP 读状态。结论：
+
+- 扩展能加载（`--load-extension` 在空 profile 第一次启动即可，service worker `src/background.js` 起到）；面板 `#bn-root` 出来，宽 380px，位置 `right:0 top:0`（`position:fixed`）。
+- 打开视频页 9 秒内零 console error、零未捕获异常。
+- 未登录时的文案是「请先登录 B站 / 没登录 B站，所以读不到这个视频的字幕。登录（右上角头像）→ 刷新本页，就会自动重新检查。＋用画面字幕试试」，没有崩也没有空面板。
+- 面板里的「设置」按钮真能打开 `chrome-extension://<id>/src/options.html`（新标签页），6 家预设 + 自定义渲染正常。
+
+**演练抓到的真 bug（1.4.34 及以前）**：`.hidden` 没有通用 CSS 规则，只有逐个选择器写了 `.xxx.hidden{display:none}`。`#packOut`（学习包卡）与 `#courseCross`（「跨集出现」chip）漏了规则 ⇒ **陌生人一装完，面板顶部就挂着「学习包已导出 / 复制『交给 agent 的话』/ 存 Markdown」，什么都没导出过**；点复制只会得到「没有可复制的话」。1.4.35 加了一条兜底 `.hidden { display: none !important; }`，同一 profile 复测：`#packOut` 与 `#courseCross` 计算样式均为 `display:none`。
+
+教训：以前每次截图都在「已经导出过」的状态下拍，所以这个假卡片一直没露出来；只有从零装一遍才会看到。

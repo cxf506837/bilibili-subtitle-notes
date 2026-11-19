@@ -49,6 +49,9 @@
     ':host { all: initial; }',
     // 配色直接取 B站 自己的一套：白底、#18191c 正文、#9499a0 次要、#e3e5e7 描边、#00aeec 强调
     ':host { --bnbg: #ffffff; --bnfg: #18191c; --bnmuted: #9499a0; --bnline: #e3e5e7; --bnline2: #c9ccd0; --bnfill: #f1f2f3; --bnfill2: #e3e5e7; --bnaccent: #00aeec; --bnaccentInk: #0091c5; --bnaccentSoft: rgba(0,174,236,.10); --bnquote: rgba(0,174,236,.55); }',
+    // 兜底：任何带 hidden 的元素都别显示。曾经 `.packout.hidden` / `.cx2.hidden` 没有对应的
+    // 隐藏规则（2026-11-19 在干净 profile 里发现：一装完面板顶上就挂着「学习包已导出」）。
+    '.hidden { display: none !important; }',
     '.wrap { position: fixed; top: 0; right: 0; width: 380px; height: 100vh; z-index: 2147483000;',
     '  display: flex; font: 13px/1.6 -apple-system, PingFang SC, Microsoft YaHei, sans-serif;',
     '  color: var(--bnfg); background: var(--bnbg); box-shadow: -2px 0 12px rgba(0,0,0,.12);',
