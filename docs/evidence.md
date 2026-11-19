@@ -1388,3 +1388,17 @@ setTimeout(function () { downloadMarkdown(pack.md, pack.baseName + '.md'); }, 60
 **演练抓到的真 bug（1.4.34 及以前）**：`.hidden` 没有通用 CSS 规则，只有逐个选择器写了 `.xxx.hidden{display:none}`。`#packOut`（学习包卡）与 `#courseCross`（「跨集出现」chip）漏了规则 ⇒ **陌生人一装完，面板顶部就挂着「学习包已导出 / 复制『交给 agent 的话』/ 存 Markdown」，什么都没导出过**；点复制只会得到「没有可复制的话」。1.4.35 加了一条兜底 `.hidden { display: none !important; }`，同一 profile 复测：`#packOut` 与 `#courseCross` 计算样式均为 `display:none`。
 
 教训：以前每次截图都在「已经导出过」的状态下拍，所以这个假卡片一直没露出来；只有从零装一遍才会看到。
+### 1.4.35 两个包逐条复测（2026-11-19）
+
+| 测什么 | 完整包（42 文件 / 11.2 MB） | 轻量包（36 文件 / 161 KB） |
+| --- | --- | --- |
+| 面板渲染 | 宽 380px | 宽 380px |
+| `#packOut` / `#courseCross` | 都是 `display:none`（1.4.35 兜底规则生效，假卡片不再出现） | 同左 |
+| 「画面字幕」按钮 | 出现 | `display:none`（探测不到 `vendor/ocr` 就隐藏） |
+| 未登录文案 | 「请先登录 B站 … 用画面字幕试试」 | 同左 |
+| console | 0 异常 | 0 异常（唯一一条来自 B站 自己的 `log-reporter.js`：`Error: COLS: response timeout`） |
+
+### Chrome 的验证边界（2026-11-19 实测）
+
+Chrome 157（`C:\Program Files\Google\Chrome\Application\chrome.exe`）+ 全新 `--user-data-dir`：加 `--load-extension` 启动后 `/json/list` 里**没有本扩展的 service worker**，页面里也没有 `#bn-root`；再加 `--enable-unsafe-extension-debugging` 结果相同。⇒ 命令行加载在 Chrome 137+ 已被关死，只能走 `chrome://extensions` →「加载已解压的扩展程序」手点，这一步我**没有**做，所以 README 与 docs/install.md 都写明「四步只在 Edge 157 真机走过」。
+

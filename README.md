@@ -30,6 +30,7 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
    选完 Edge 顶部可能会弹一条「请停用以开发者模式运行的扩展程序」——点 × 关掉它，不要点「停用」。
 4. 点工具栏拼图图标把「B站字幕笔记」钉出来；打开任意视频页点它，按「设置」选一家服务商（预设会自动填好 API Base 和模型），再填 Key。
    不想申请 Key 也行：字幕抓稳后直接点「导出」，得到逐句字幕全文（第 4 步之外的部分照常用）。
+   上面四步我在 Edge 157 上真机走过一遍；Chrome 同属 MV3、步骤一样，但**我没有在 Chrome 上真机装过**（Chrome 137 起也忽略了命令行的 `--load-extension`，只能这样手点），遇到问题请开 issue。
 
 设置页内置 6 家预设：DeepSeek / OpenAI / 通义千问 / 智谱 GLM / Moonshot / 本机 Ollama。填**别的**域名会在保存时被挡——浏览器扩展只能连 `manifest.json` 里声明过的域名，没声明的域名在 MV3 里只会报一句 `TypeError: Failed to fetch`，分不清是断网、Key 错还是没权限，所以干脆在保存那一步就说清楚。想加服务商请开 issue。不想自己打包的话，[Releases](https://github.com/cxf506837/bilibili-subtitle-notes/releases) 里有打好的 zip（完整版 11 MB，带本地 OCR；轻量版 161 KB，不含 OCR）。装不上、图标灰着、Key 存不住 → [docs/install.md](docs/install.md)。
 
