@@ -22,7 +22,11 @@ B站 字幕接口**同一个视频多刷几次会返回不同文件**：作者�
 
 实测数据（60 条视频可用率、8 次取样 4 种文件、950 条离线测试）见 [docs/evidence.md](docs/evidence.md)；隐私说明见 [PRIVACY.md](PRIVACY.md)。
 
-## 装（约 3 分钟）
+## 装
+
+**最省事：** [Edge 商店装上](https://microsoftedge.microsoft.com/addons/detail/ddhadakcmdphnhobaglplkddlgaifjnh)（点「获取」）。商店版要过审核，会滞后于 [Releases](https://github.com/cxf506837/bilibili-subtitle-notes/releases)——想要最新版就用下面这种手动加载。
+
+**或者自己加载**（约 3 分钟）：
 
 1. 先**登录 B站**（未登录时字幕接口返回 0 轨）。
 2. 打开 `edge://extensions`（Chrome 是 `chrome://extensions`），打开右上角「开发人员模式」。

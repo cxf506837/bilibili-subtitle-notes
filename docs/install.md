@@ -1,6 +1,10 @@
 # 安装与排错
 
-## 装到自己的浏览器（推荐）
+## 最省事：从 Edge 商店装
+
+打开 [Edge 商店页面](https://microsoftedge.microsoft.com/addons/detail/ddhadakcmdphnhobaglplkddlgaifjnh) 点「获取」。商店版要过审核，会滞后于 [Releases](https://github.com/cxf506837/bilibili-subtitle-notes/releases)（当前商店是 1.4.7，仓库已到 1.4.35）；想要最新版、或者用 Chrome，就往下走手动加载。商店版的更新由浏览器自己拉，不用手动「重新加载」。
+
+## 手动加载到自己的浏览器（最新版走这条）
 
 1. 打开 `edge://extensions`（Chrome 是 `chrome://extensions`）。
 2. 打开右上角「开发人员模式」。
